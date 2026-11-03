@@ -46,9 +46,7 @@ jobs:
           if (-not (Test-Path -LiteralPath $compiler)) { throw "Inno Setup compiler not found." }
 
           $iss = Get-Content -LiteralPath '.\installer\WindowsNext.iss' -Raw
-          if ($iss -notmatch '(?m)^#define ProductVersion "([0-9]+\.[0-9]+\.[0-9]+)"\s*          if-no-files-found: error
-          retention-days: 30
-) {
+          if ($iss -notmatch '(?m)^#define ProductVersion "(\d+\.\d+\.\d+)"\s*$') {
             throw "ProductVersion was not found in installer/WindowsNext.iss."
           }
           $version = $Matches[1]
