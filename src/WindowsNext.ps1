@@ -118,6 +118,37 @@ function Update-WnVolumePicker{
   if($items.DriveLetter -contains $target){$volumePicker.SelectedValue=$target}else{$volumePicker.SelectedIndex=0}
  }
 }
+function Update-WnStartupGrid {
+ $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
+ [void][IO.Directory]::CreateDirectory($backupDirectory)
+ $table=New-Object System.Data.DataTable
+ [void]$table.Columns.Add('Selected',[bool])
+ [void]$table.Columns.Add('Name',[string])
+ [void]$table.Columns.Add('Command',[string])
+ [void]$table.Columns.Add('Scope',[string])
+ [void]$table.Columns.Add('Status',[string])
+ [void]$table.Columns.Add('CanDisable',[bool])
+ [void]$table.Columns.Add('Id',[string])
+ [void]$table.Columns.Add('BackupFile',[string])
+
+ foreach($entry in @(Get-WnStartupEntries)){
+  [void]$table.Rows.Add($false,[string]$entry.Name,[string]$entry.Command,[string]$entry.Scope,[string]$entry.Status,[bool]$entry.CanDisable,[string]$entry.Id,'')
+ }
+ foreach($backup in @(Get-WnStartupBackups -BackupDirectory $backupDirectory)){
+  [void]$table.Rows.Add($false,[string]$backup.Name,[string]$backup.Command,'Резервная копия',[string]$backup.Status,$false,'',[string]$backup.BackupFile)
+ }
+ $startupGrid.DataSource=$table
+ foreach($column in $startupGrid.Columns){$column.ReadOnly=$true}
+ $startupGrid.Columns['Selected'].ReadOnly=$false
+ $startupGrid.Columns['Selected'].HeaderText='Выбрать'
+ $startupGrid.Columns['Name'].HeaderText='Название'
+ $startupGrid.Columns['Command'].HeaderText='Команда запуска'
+ $startupGrid.Columns['Scope'].HeaderText='Область'
+ $startupGrid.Columns['Status'].HeaderText='Состояние'
+ $startupGrid.Columns['CanDisable'].Visible=$false
+ $startupGrid.Columns['Id'].Visible=$false
+ $startupGrid.Columns['BackupFile'].Visible=$false
+}
 function Update-WnLogs{
  $files=@(Get-ChildItem -LiteralPath $script:LogsPath -Filter 'WindowsNext-*.log' -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 12)
  $out=New-Object 'System.Collections.Generic.List[string]'
@@ -186,7 +217,8 @@ $home=New-Object System.Windows.Forms.TabPage;$home.Text='Главная';$home.
 $maint=New-Object System.Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
 $drivers=New-Object System.Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
 $logs=New-Object System.Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
-[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$logs))
+$startup=New-Object System.Windows.Forms.TabPage;$startup.Text='Автозагрузка';$startup.BackColor=$script:Back
+[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$startup,$logs))
 
 $homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object System.Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
 $homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
@@ -222,6 +254,21 @@ $driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$
 $driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
 $driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
 $driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote);$driverPanel.Controls.SetChildIndex($driverBar,0);$driverPanel.Controls.SetChildIndex($driverNote,1)
+
+$startupPanel=New-Object System.Windows.Forms.Panel;$startupPanel.Dock='Fill';$startupPanel.Padding=New-Object System.Windows.Forms.Padding(12);$startup.Controls.Add($startupPanel)
+$startupBar=New-Object System.Windows.Forms.FlowLayoutPanel;$startupBar.Dock='Top';$startupBar.Height=54;$startupPanel.Controls.Add($startupBar)
+$startupRefresh=New-WnButton 'Обновить список' 180
+$startupDisable=New-WnButton 'Отключить выбранные' 220
+$startupRestore=New-WnButton 'Восстановить выбранные' 230
+$startupBar.Controls.AddRange(@($startupRefresh,$startupDisable,$startupRestore))
+$startupGrid=New-Object System.Windows.Forms.DataGridView;$startupGrid.Dock='Fill';$startupGrid.ReadOnly=$false
+$startupGrid.AllowUserToAddRows=$false;$startupGrid.AllowUserToDeleteRows=$false;$startupGrid.AutoSizeColumnsMode='Fill'
+$startupGrid.RowHeadersVisible=$false;$startupGrid.SelectionMode='FullRowSelect';$startupGrid.MultiSelect=$false
+$startupGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$startupPanel.Controls.Add($startupGrid)
+$startupNote=New-Object System.Windows.Forms.Label;$startupNote.Dock='Bottom';$startupNote.Height=48
+$startupNote.ForeColor=$script:Muted
+$startupNote.Text='Отключаются только выбранные записи автозагрузки текущего пользователя. Перед удалением создаётся копия; системная автозагрузка доступна только для просмотра.'
+$startupPanel.Controls.Add($startupNote);$startupPanel.Controls.SetChildIndex($startupBar,0);$startupPanel.Controls.SetChildIndex($startupNote,1)
 
 $logPanel=New-Object System.Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object System.Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
 $logBar=New-Object System.Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
@@ -291,10 +338,51 @@ $backupFolder.Add_Click({
 })
 $logRefresh.Add_Click({Update-WnLogs})
 $logFolder.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:LogsPath)})
+$startupGrid.Add_CurrentCellDirtyStateChanged({
+ if($startupGrid.IsCurrentCellDirty){[void]$startupGrid.CommitEdit([System.Windows.Forms.DataGridViewDataErrorContexts]::Commit)}
+})
+$startupRefresh.Add_Click({try{Update-WnStartupGrid}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$startupDisable.Add_Click({
+ $selected=@($startupGrid.Rows|Where-Object{[bool]$_.Cells['Selected'].Value -and [bool]$_.Cells['CanDisable'].Value})
+ if($selected.Count -eq 0){[System.Windows.Forms.MessageBox]::Show('Выбери одну или несколько записей из раздела текущего пользователя.','Автозагрузка','OK','Information')|Out-Null;return}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Отключить выбранные программы при входе в Windows? Перед изменением будет создана резервная копия. Не отключай незнакомые компоненты безопасности, драйверы и системные средства.','Изменение автозагрузки','YesNo','Warning')
+ if($choice -ne [System.Windows.Forms.DialogResult]::Yes){return}
+ $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
+ $done=0;$errors=New-Object 'System.Collections.Generic.List[string]'
+ foreach($row in $selected){
+  try{
+   $id=[string]$row.Cells['Id'].Value
+   $entry=@(Get-WnStartupEntries|Where-Object{$_.Id -eq $id})
+   if($entry.Count -ne 1){throw 'Запись изменилась. Обнови список.'}
+   [void](Disable-WnStartupEntry -Entry $entry[0] -BackupDirectory $backupDirectory)
+   $done++
+  }catch{$errors.Add([string]$_.Exception.Message)}
+ }
+ Update-WnStartupGrid
+ $message=('Отключено записей: {0}.' -f $done)
+ if($errors.Count -gt 0){$message+=[Environment]::NewLine+'Ошибки: '+($errors -join '; ')}
+ [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
+})
+$startupRestore.Add_Click({
+ $selected=@($startupGrid.Rows|Where-Object{[bool]$_.Cells['Selected'].Value -and -not [string]::IsNullOrWhiteSpace([string]$_.Cells['BackupFile'].Value)})
+ if($selected.Count -eq 0){[System.Windows.Forms.MessageBox]::Show('Выбери резервную копию, которую нужно восстановить.','Автозагрузка','OK','Information')|Out-Null;return}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Восстановить выбранные записи автозагрузки? Существующие значения с таким же именем не будут перезаписаны.','Восстановление автозагрузки','YesNo','Question')
+ if($choice -ne [System.Windows.Forms.DialogResult]::Yes){return}
+ $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
+ $done=0;$errors=New-Object 'System.Collections.Generic.List[string]'
+ foreach($row in $selected){
+  try{[void](Restore-WnStartupEntry -BackupFile ([string]$row.Cells['BackupFile'].Value) -BackupDirectory $backupDirectory);$done++}
+  catch{$errors.Add([string]$_.Exception.Message)}
+ }
+ Update-WnStartupGrid
+ $message=('Восстановлено записей: {0}.' -f $done)
+ if($errors.Count -gt 0){$message+=[Environment]::NewLine+'Ошибки: '+($errors -join '; ')}
+ [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
+})
 
 $form.Add_Shown({
  try{
-  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnLogs
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnStartupGrid;Update-WnLogs
   $maintInfo.Text=@'
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
