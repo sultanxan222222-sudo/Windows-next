@@ -136,7 +136,7 @@ function Restore-WnStartupEntry {
         $key.SetValue([string]$backup.Name, [string]$backup.Value, $kind)
     } finally { $key.Dispose() }
 
-    $restoredPath = [IO.Path]::ChangeExtension($fullPath, '.restored.json')
+    $restoredPath = [IO.Path]::ChangeExtension($fullPath, '.restored')
     Move-Item -LiteralPath $fullPath -Destination $restoredPath -ErrorAction Stop
     [pscustomobject]@{ Name=[string]$backup.Name; Restored=$true; ArchiveFile=$restoredPath }
 }
