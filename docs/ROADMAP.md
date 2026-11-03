@@ -14,6 +14,7 @@
 - [x] Check the Microsoft Update Catalog for the exact Atheros subsystem ID.
 - [x] Keep every unverified driver blocked in the component manifest.
 - [ ] Finish independent review of storage, audio, chipset, USB, card-reader, touchpad, and camera devices.
+- [ ] Assess a supported OS servicing path; the installed Windows 11 Pro 21H2 release is out of support, and no feature upgrade may run unattended on this unsupported CPU.
 
 ## M2 — one-file installer foundation
 - [x] Add Inno Setup definition for a single self-installing EXE.
