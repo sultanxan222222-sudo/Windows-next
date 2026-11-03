@@ -6,6 +6,7 @@ BeforeAll {
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Performance.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Startup.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Force
 }
 
 Describe 'Windows Next source validation' {
@@ -178,6 +179,23 @@ Describe 'Windows Next source validation' {
             CanDisable = $false
         }
         { Disable-WnStartupEntry -Entry $entry -BackupDirectory (Join-Path $TestDrive 'blocked') } | Should -Throw
+    }
+
+
+    It 'reports Visual C++ x86 and x64 runtime status without changing the system' {
+        $status = @(Get-WnVCRuntimeStatus)
+        $status.Count | Should -Be 2
+        ($status | Where-Object { $_.Architecture -eq 'x86' }).Count | Should -Be 1
+        ($status | Where-Object { $_.Architecture -eq 'x64' }).Count | Should -Be 1
+        ($status | Where-Object { $_.RegistryPath -notmatch '^HKLM:' }).Count | Should -Be 0
+    }
+
+    It 'uses Microsoft-owned HTTPS endpoints for Visual C++ runtime packages' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Raw
+        $module | Should -Match 'https://aka\.ms/vc14/vc_redist\.x64\.exe'
+        $module | Should -Match 'https://aka\.ms/vc14/vc_redist\.x86\.exe'
+        $module | Should -Match 'Get-AuthenticodeSignature'
+        $module | Should -Match 'Microsoft Corporation'
     }
 
 }
