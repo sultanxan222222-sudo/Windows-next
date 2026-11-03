@@ -245,4 +245,11 @@ Describe 'Windows Next source validation' {
         $module | Should -Match 'NetFx3 state after operation'
     }
 
+
+    It 'does not recurse into Temp subfolders or junctions during cleanup' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Raw
+        $module | Should -Match 'Get-ChildItem -LiteralPath \$tempRoot -File -Force'
+        $module | Should -Not -Match 'Get-ChildItem -LiteralPath \$tempRoot -File -Recurse'
+    }
+
 }
