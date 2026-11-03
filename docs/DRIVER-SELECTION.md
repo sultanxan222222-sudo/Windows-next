@@ -21,18 +21,18 @@ A family name such as HD 4600 or GT 750M is not a sufficient match.
 - If package provenance, signature, or hash cannot be verified: stop.
 - If the INF does not match the exact device: stop; never force-install it.
 - If two packages conflict or the preferred package is uncertain: stop and request engineering review.
-- No package is downloaded or installed by the current inventory milestone.
+- No third-party vendor pack is downloaded or installed by this catalog. A separate user-approved Windows Update Agent workflow can offer only the machine's configured Windows Update driver-category entries, after exact live Hardware ID and strictly newer driver-date checks.
 
-## Installation sequence planned for a later milestone
+## Windows Update driver workflow implemented in the app
 
-1. Verify prerequisites, free disk space, power state, package hashes, and signatures.
-2. Export the currently installed third-party driver packages and record their versions.
-3. Create a restore point when System Protection is available; if the required recovery baseline cannot be made, stop.
-4. Stage one approved driver package at a time.
-5. Install only through supported Windows driver-installation mechanisms.
-6. Re-enumerate the device and check its status, driver version, INF, and signature.
-7. Run stability checks before permitting the next component.
-8. On failure, stop the sequence and invoke the documented rollback path.
+1. Search only `IsInstalled=0 and Type='Driver' and IsHidden=0` through the Windows Update Agent service already configured on the computer.
+2. Reject updates without driver metadata, an exact live hardware-ID match, a newer driver date, or a noninteractive installation behavior.
+3. Ask the user to select exactly one candidate; install one driver per operation.
+4. Require at least 2 GB of free space, export current third-party driver packages, and successfully create a restore point. Stop if either recovery step fails.
+5. Accept the selected package's EULA only after the user's confirmation, download through Windows Update Agent, and install without a forced reboot.
+6. Check the WUA installation result. If no reboot is required, re-enumerate device driver state; if reboot is required, defer final verification until after restart.
+7. Stop after the one driver. The user must test device operation before selecting another update.
+8. If a problem occurs, use the restore point or Device Manager's supported driver rollback. Windows Next does not bypass signature enforcement or force a driver package.
 
 ## DirectX
 
