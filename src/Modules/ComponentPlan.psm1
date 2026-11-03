@@ -16,6 +16,19 @@ function Get-WnComponentPlan {
         throw ('Unsupported component manifest schema: {0}' -f $manifest.schemaVersion)
     }
 
+    $warnings = @()
+    $osBuild = ''
+    $osRelease = ''
+    if ($null -ne $Audit.OperatingSystem) {
+        $osBuild = [string]$Audit.OperatingSystem.BuildNumber
+        if ($Audit.OperatingSystem.PSObject.Properties.Name -contains 'DisplayVersion') {
+            $osRelease = [string]$Audit.OperatingSystem.DisplayVersion
+        }
+    }
+    if ($osRelease -eq '21H2' -or $osBuild -eq '22000') {
+        $warnings += 'Windows 11 Pro/Home 21H2 ended servicing on 2023-10-10 and no longer receives security updates. Do not attempt an unattended feature upgrade on this unsupported CPU.'
+    }
+
     $planned = @()
     foreach ($component in @($manifest.components)) {
         $collection = @()
@@ -79,6 +92,7 @@ function Get-WnComponentPlan {
         ManifestVersion          = $manifest.schemaVersion
         InstallationEnabled      = $false
         Summary                  = 'READ_ONLY — no component is authorized for automatic installation.'
+        Warnings                 = @($warnings)
         Components               = @($planned)
     }
 }
