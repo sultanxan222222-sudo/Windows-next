@@ -119,6 +119,36 @@ function Update-WnVolumePicker{
   if($items.DriveLetter -contains $target){$volumePicker.SelectedValue=$target}else{$volumePicker.SelectedIndex=0}
  }
 }
+function Update-WnDriverCandidateGrid {
+ param([object[]]$Candidates=@())
+ $table=New-Object System.Data.DataTable
+ [void]$table.Columns.Add('Selected',[bool])
+ [void]$table.Columns.Add('Driver',[string])
+ [void]$table.Columns.Add('Manufacturer',[string])
+ [void]$table.Columns.Add('Model',[string])
+ [void]$table.Columns.Add('Provider',[string])
+ [void]$table.Columns.Add('Class',[string])
+ [void]$table.Columns.Add('Date',[string])
+ [void]$table.Columns.Add('CurrentVersion',[string])
+ [void]$table.Columns.Add('HardwareId',[string])
+ [void]$table.Columns.Add('UpdateId',[string])
+ foreach($candidate in $Candidates){
+  [void]$table.Rows.Add($false,[string]$candidate.Title,[string]$candidate.Manufacturer,[string]$candidate.Model,[string]$candidate.Provider,[string]$candidate.DriverClass,[string]$candidate.DriverDate,[string]$candidate.CurrentDriverVersion,[string]$candidate.HardwareId,[string]$candidate.UpdateId)
+ }
+ $driverUpdateGrid.DataSource=$table
+ foreach($column in $driverUpdateGrid.Columns){$column.ReadOnly=$true}
+ $driverUpdateGrid.Columns['Selected'].ReadOnly=$false
+ $driverUpdateGrid.Columns['Selected'].HeaderText='Выбрать'
+ $driverUpdateGrid.Columns['Driver'].HeaderText='Драйвер'
+ $driverUpdateGrid.Columns['Manufacturer'].HeaderText='Производитель'
+ $driverUpdateGrid.Columns['Model'].HeaderText='Модель'
+ $driverUpdateGrid.Columns['Provider'].HeaderText='Поставщик'
+ $driverUpdateGrid.Columns['Class'].HeaderText='Класс'
+ $driverUpdateGrid.Columns['Date'].HeaderText='Дата пакета'
+ $driverUpdateGrid.Columns['CurrentVersion'].HeaderText='Установленная версия'
+ $driverUpdateGrid.Columns['HardwareId'].HeaderText='Точный Hardware ID'
+ $driverUpdateGrid.Columns['UpdateId'].Visible=$false
+}
 function Update-WnComponents {
  $lines=New-Object 'System.Collections.Generic.List[string]'
  $lines.Add('WINDOWS NEXT — ПРОВЕРКА ИГРОВЫХ БИБЛИОТЕК')
@@ -189,6 +219,25 @@ function Finish-WnTask([object]$Result){
    if($Result.Result.RebootRequired){$message+=[Environment]::NewLine+'Для завершения установки требуется перезагрузка.'}
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   }
+  if($Result.Action -eq 'CheckDriverUpdates' -and $Result.Result){
+   $candidates=@($Result.Result.Candidates)
+   Update-WnDriverCandidateGrid -Candidates $candidates
+   if($candidates.Count -gt 0){$message=('Найдено подходящих драйверов: {0}. Выбери только один для установки.' -f $candidates.Count)}
+   else{$message='Windows Update не нашёл более новых драйверов с точным совпадением Hardware ID. Ничего не изменено.'}
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  if($Result.Action -eq 'InstallSelectedDriver' -and $Result.Result){
+   $installation=$Result.Result.Installation
+   $message='Установка драйвера через Windows Update завершена.'
+   $message+=[Environment]::NewLine+'Драйвер: '+[string]$installation.Title
+   $message+=[Environment]::NewLine+'Резервная копия: '+[string]$Result.Result.BackupPath
+   if($installation.RebootRequired){$message+=[Environment]::NewLine+'Требуется перезагрузка Windows. Она не будет выполняться автоматически.'}
+   else{
+    $message+=[Environment]::NewLine+'Перезагрузка не требуется. Проверь устройство в Диспетчере устройств перед следующей установкой.'
+    Update-WnDrivers
+   }
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
   if($Result.Action -eq 'ExportDrivers' -and $Result.Result){
    $message=('Экспортировано пакетов: {0}' -f $Result.Result.PackageCount)
    $message+=[Environment]::NewLine+'Папка: '+[string]$Result.Result.Destination
@@ -241,10 +290,11 @@ $tabs=New-Object System.Windows.Forms.TabControl;$tabs.Dock='Fill';$tabs.Font=Ne
 $home=New-Object System.Windows.Forms.TabPage;$home.Text='Главная';$home.BackColor=$script:Back
 $maint=New-Object System.Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
 $drivers=New-Object System.Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
+$driverUpdates=New-Object System.Windows.Forms.TabPage;$driverUpdates.Text='Поиск обновлений';$driverUpdates.BackColor=$script:Back
 $components=New-Object System.Windows.Forms.TabPage;$components.Text='Библиотеки';$components.BackColor=$script:Back
 $logs=New-Object System.Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
 $startup=New-Object System.Windows.Forms.TabPage;$startup.Text='Автозагрузка';$startup.BackColor=$script:Back
-[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$components,$startup,$logs))
+[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$driverUpdates,$components,$startup,$logs))
 
 $homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object System.Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
 $homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
@@ -280,6 +330,19 @@ $driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$
 $driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
 $driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
 $driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote);$driverPanel.Controls.SetChildIndex($driverBar,0);$driverPanel.Controls.SetChildIndex($driverNote,1)
+
+$driverUpdatePanel=New-Object System.Windows.Forms.Panel;$driverUpdatePanel.Dock='Fill';$driverUpdatePanel.Padding=New-Object System.Windows.Forms.Padding(12);$driverUpdates.Controls.Add($driverUpdatePanel)
+$driverUpdateBar=New-Object System.Windows.Forms.FlowLayoutPanel;$driverUpdateBar.Dock='Top';$driverUpdateBar.Height=54;$driverUpdatePanel.Controls.Add($driverUpdateBar)
+$driverUpdateSearch=New-WnButton 'Найти драйверы' 180
+$driverUpdateInstall=New-WnButton 'Установить один выбранный' 250
+$driverUpdateBar.Controls.AddRange(@($driverUpdateSearch,$driverUpdateInstall))
+$driverUpdateGrid=New-Object System.Windows.Forms.DataGridView;$driverUpdateGrid.Dock='Fill';$driverUpdateGrid.ReadOnly=$false
+$driverUpdateGrid.AllowUserToAddRows=$false;$driverUpdateGrid.AllowUserToDeleteRows=$false;$driverUpdateGrid.AutoSizeColumnsMode='Fill'
+$driverUpdateGrid.RowHeadersVisible=$false;$driverUpdateGrid.SelectionMode='FullRowSelect';$driverUpdateGrid.MultiSelect=$false
+$driverUpdateGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverUpdatePanel.Controls.Add($driverUpdateGrid)
+$driverUpdateNote=New-Object System.Windows.Forms.Label;$driverUpdateNote.Dock='Bottom';$driverUpdateNote.Height=58;$driverUpdateNote.ForeColor=$script:Muted
+$driverUpdateNote.Text='Поиск идёт через настроенный Windows Update и показывает только точные Hardware ID с более новой датой драйвера. Перед каждой установкой создаётся копия драйверов и точка восстановления. Устанавливается только один драйвер за операцию; автоматической перезагрузки нет. Если Windows Update не предлагает подходящий пакет, Windows Next ничего не устанавливает.'
+$driverUpdatePanel.Controls.Add($driverUpdateNote);$driverUpdatePanel.Controls.SetChildIndex($driverUpdateBar,0);$driverUpdatePanel.Controls.SetChildIndex($driverUpdateNote,1)
 
 $componentPanel=New-Object System.Windows.Forms.Panel;$componentPanel.Dock='Fill';$componentPanel.Padding=New-Object System.Windows.Forms.Padding(12);$components.Controls.Add($componentPanel)
 $componentBar=New-Object System.Windows.Forms.FlowLayoutPanel;$componentBar.Dock='Top';$componentBar.Height=54;$componentPanel.Controls.Add($componentBar)
@@ -369,6 +432,30 @@ $backupFolder.Add_Click({
  $folder=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
  [void][IO.Directory]::CreateDirectory($folder);Start-Process explorer.exe -ArgumentList ('"{0}"' -f $folder)
 })
+$driverUpdateGrid.Add_CurrentCellDirtyStateChanged({
+ if($driverUpdateGrid.IsCurrentCellDirty){[void]$driverUpdateGrid.CommitEdit([System.Windows.Forms.DataGridViewDataErrorContexts]::Commit)}
+})
+$driverUpdateSearch.Add_Click({
+ if($null -ne $script:ActiveTask){return}
+ Update-WnDriverCandidateGrid
+ Start-WnTask -Action CheckDriverUpdates -Caption 'Поиск совместимых драйверов через Windows Update'
+})
+$driverUpdateInstall.Add_Click({
+ $selected=@($driverUpdateGrid.Rows|Where-Object{[bool]$_.Cells['Selected'].Value})
+ if($selected.Count -ne 1){[System.Windows.Forms.MessageBox]::Show('Отметь ровно один драйвер. Установка нескольких драйверов за раз запрещена.','Обновление драйверов','OK','Warning')|Out-Null;return}
+ $row=$selected[0]
+ $title=[string]$row.Cells['Driver'].Value
+ $hardwareId=[string]$row.Cells['HardwareId'].Value
+ $date=[string]$row.Cells['Date'].Value
+ $updateId=[string]$row.Cells['UpdateId'].Value
+ $choice=[System.Windows.Forms.MessageBox]::Show(('Установить этот драйвер через Windows Update?'+[Environment]::NewLine+[Environment]::NewLine+$title+[Environment]::NewLine+'Дата драйвера: '+$date+[Environment]::NewLine+'Hardware ID: '+$hardwareId+[Environment]::NewLine+[Environment]::NewLine+'Перед установкой Windows Next экспортирует текущие драйверы и создаст точку восстановления. Автоматической перезагрузки не будет.'),'Проверка драйвера','YesNo','Warning')
+ if($choice -ne [System.Windows.Forms.DialogResult]::Yes){return}
+ $selectionDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\Selections'
+ [void][IO.Directory]::CreateDirectory($selectionDirectory)
+ $selectionFile=Join-Path $selectionDirectory (([guid]::NewGuid().ToString('N'))+'.json')
+ @{UpdateIds=@($updateId)}|ConvertTo-Json -Depth 3|Set-Content -LiteralPath $selectionFile -Encoding UTF8
+ Start-WnTask -Action InstallSelectedDriver -Caption ('Установка драйвера: '+$title) -SelectionFile $selectionFile -Admin
+})
 $componentRefresh.Add_Click({try{Update-WnComponents}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
 $componentInstall.Add_Click({
  $choice=[System.Windows.Forms.MessageBox]::Show('Загрузить официальные Microsoft Visual C++ Runtime x86 и x64, проверить цифровую подпись и установить только при отсутствии или более старой версии? Нужен интернет.','Игровые библиотеки','YesNo','Question')
@@ -420,7 +507,7 @@ $startupRestore.Add_Click({
 
 $form.Add_Shown({
  try{
-  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnComponents;Update-WnStartupGrid;Update-WnLogs
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnDriverCandidateGrid;Update-WnVolumePicker;Update-WnComponents;Update-WnStartupGrid;Update-WnLogs
   $maintInfo.Text=@'
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
