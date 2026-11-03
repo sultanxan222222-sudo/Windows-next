@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
- [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint','InstallVCRuntime')]
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint','InstallVCRuntime','CheckDriverUpdates','InstallSelectedDriver')]
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
