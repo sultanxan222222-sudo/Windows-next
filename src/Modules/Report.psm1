@@ -112,6 +112,9 @@ function Export-WnAuditReport {
     $lines.Add('COMPONENT INSTALLATION PLAN')
     if ($null -ne $ComponentPlan) {
         $lines.Add([string]$ComponentPlan.Summary)
+        foreach ($warning in @($ComponentPlan.Warnings)) {
+            $lines.Add(('WARNING: {0}' -f $warning))
+        }
         foreach ($component in @($ComponentPlan.Components)) {
             $lines.Add(('{0}: {1} | detected: {2} | installed driver: {3}' -f
                 $component.DisplayName, $component.Decision, $component.Detected, $component.InstalledDriverVersion))
