@@ -198,13 +198,18 @@ function Get-WnNetworkDevices {
             continue
         }
 
+        $driverDate = $null
+        if ($null -ne $driver.DriverDate) {
+            try { $driverDate = ([datetime]$driver.DriverDate).ToString('yyyy-MM-dd') } catch { $driverDate = $null }
+        }
+
         $items += [pscustomobject]@{
             Name          = $name
             Class         = $class
             Manufacturer  = [string]$driver.Manufacturer
             InstanceId    = [string]$driver.DeviceID
             DriverVersion = [string]$driver.DriverVersion
-            DriverDate    = try { ([datetime]$driver.DriverDate).ToString('yyyy-MM-dd') } catch { $null }
+            DriverDate    = $driverDate
             InfName       = [string]$driver.InfName
             IsSigned      = $driver.IsSigned
         }
