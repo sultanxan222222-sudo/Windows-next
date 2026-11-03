@@ -186,13 +186,32 @@ function Install-WnWindowsUpdateDriver {
     if (-not $rebootRequired) {
         $after = @(Get-CimInstance -ClassName Win32_PnPSignedDriver -ErrorAction Stop |
             Where-Object { $deviceIds -contains [string]$_.DeviceID })
-        foreach ($device in $after) {
+        $pnpAfter = @(Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction Stop |
+            Where-Object { $deviceIds -contains [string]$_.PNPDeviceID })
+
+        foreach ($baseline in $candidate[0].MatchedDevices) {
+            $device = @($after | Where-Object { [string]::Equals([string]$_.DeviceID,[string]$baseline.DeviceId,[StringComparison]::OrdinalIgnoreCase) })
+            $pnp = @($pnpAfter | Where-Object { [string]::Equals([string]$_.PNPDeviceID,[string]$baseline.DeviceId,[StringComparison]::OrdinalIgnoreCase) })
+            if ($device.Count -ne 1 -or $pnp.Count -ne 1 -or $null -eq $device[0].DriverDate) {
+                throw ('The driver install returned success, but the device state could not be verified for {0}. Stop before installing another driver and inspect Device Manager.' -f $baseline.DeviceName)
+            }
+
+            $newDate = [datetime]$device[0].DriverDate
+            $newerThanBaseline = ($newDate -gt [datetime]$baseline.CurrentDriverDate)
+            $deviceHealthy = ([int]$pnp[0].ConfigManagerErrorCode -eq 0)
             $verification.Add([pscustomobject]@{
-                DeviceName = [string]$device.DeviceName
-                DriverVersion = [string]$device.DriverVersion
-                DriverDate = if ($null -ne $device.DriverDate) { ([datetime]$device.DriverDate).ToString('yyyy-MM-dd') } else { '' }
+                DeviceName = [string]$device[0].DeviceName
+                DriverVersion = [string]$device[0].DriverVersion
+                DriverDate = $newDate.ToString('yyyy-MM-dd')
+                NewerThanPreviousDriver = $newerThanBaseline
+                DeviceManagerStatusOK = $deviceHealthy
             })
+
+            if (-not $newerThanBaseline -or -not $deviceHealthy) {
+                throw ('The Windows Update installer reported success, but the updated driver was not fully verified for {0}. Do not install another driver; inspect Device Manager and use the restore point if necessary.' -f $baseline.DeviceName)
+            }
         }
+
         if ($verification.Count -eq 0) {
             throw 'The driver installation completed, but Windows did not return the affected device state. Check Device Manager before continuing.'
         }
