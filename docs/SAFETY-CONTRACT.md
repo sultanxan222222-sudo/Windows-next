@@ -24,6 +24,13 @@ The user requires a careful, evidence-led process. This document is a release co
 - Keep a human-readable log and a machine-readable result.
 - Do not promise zero risk. Engineering must minimize, detect, and contain risk.
 
-## Current build
+## Changes currently permitted
 
-The current milestone only reads hardware, OS, graphics-driver, storage, active power-plan, and Secure Boot status. It writes report files under the current user's LocalAppData directory. It does not require administrator rights and does not alter the system.
+- Current-user Run startup entries may be disabled only one-by-one or as explicitly selected by the user. Windows Next writes a backup containing the exact value and registry data type before deleting the entry. Restore refuses to overwrite an existing value. HKLM entries are view-only.
+- Microsoft Visual C++ v14 x86/x64 may be installed from Microsoft's official stable aka.ms endpoints only after explicit confirmation and UAC. The installer must have a valid Authenticode signature from Microsoft Corporation. SHA-256 is recorded in the operation log. An installed equal/newer version is never downgraded. Temporary setup files are removed.
+- Built-in maintenance functions are limited to user Temp cleanup, Optimize-Volume, online NTFS scan, DISM/SFC health checks, and repair only after a successful restore-point operation and explicit confirmation.
+- Driver inventory and export are allowed; third-party driver replacement is still disabled until exact-ID, OS-build, signature, and rollback validation passes.
+
+## Current build evidence
+
+The hosted CI checks parse PowerShell, run ScriptAnalyzer at Error severity, and run Pester tests. These checks do not replace first-launch, install/uninstall, sleep/wake, graphics-switching, audio, network, or game testing on the actual Acer Aspire V3-772. No release may claim hardware acceptance until that testing has been performed.
