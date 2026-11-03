@@ -65,4 +65,4 @@ The current Broadcom Ethernet and Qualcomm Bluetooth packages remain unchanged u
 
 ## Release decision
 
-As of this research snapshot, there are **zero approved unattended driver packages** for the current Acer / Windows 11 target. The single-file installer therefore installs Windows Next itself and runs read-only diagnostics. Driver installation stays disabled until evidence and rollback tests are complete.
+As of this research snapshot, there are **zero approved third-party driver packages** for unattended installation on the current Acer / Windows 11 target. Windows Next therefore keeps the existing GPU, WLAN, Ethernet, and Bluetooth drivers unchanged; it inventories and backs them up only. A separate optional software component is Microsoft Visual C++ v14 x86/x64 from Microsoft's official aka.ms endpoints; the installer checks Authenticode publisher validity, logs SHA-256, skips already-current runtimes, and verifies the resulting registry version. This runtime is an application dependency and does not add DirectX feature support to either GPU. The maintenance center and user startup manager operate separately under the safety contract.
