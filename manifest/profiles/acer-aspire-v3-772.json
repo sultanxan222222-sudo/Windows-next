@@ -1,27 +1,88 @@
 {
-  "profileId": "acer-aspire-v3-772-user-reported",
-  "profilePurpose": "planning-hint-only",
-  "mustConfirmAgainstLiveInventory": true,
-  "reportedHardware": {
+  "profileId": "acer-aspire-v3-772-confirmed-inventory",
+  "profilePurpose": "confirmed-from-user-provided-windows-inventory",
+  "mustConfirmAgainstLiveInventoryBeforeAnySystemChange": true,
+  "system": {
     "manufacturer": "Acer",
     "model": "Aspire V3-772",
-    "processor": "Intel Core i5-4200M",
-    "integratedGraphics": "Intel HD Graphics 4600",
-    "discreteGraphics": "NVIDIA GeForce GT 750M",
-    "installedMemoryGB": 8
+    "sku": "Aspire V3-772_0781_1.12",
+    "motherboard": "Acer VA70 HW",
+    "biosVersion": "V1.12",
+    "biosDate": "2013-09-19"
   },
-  "reportedOperatingSystem": {
-    "name": "Windows 11",
+  "operatingSystem": {
+    "name": "Windows 11 Pro",
+    "version": "10.0",
+    "build": "22000.2600",
     "architecture": "x64",
-    "exactBuild": "unknown"
+    "secureBoot": true
   },
+  "processor": {
+    "model": "Intel Core i5-4200M",
+    "cores": 2,
+    "logicalProcessors": 4
+  },
+  "graphics": [
+    {
+      "name": "Intel HD Graphics 4600",
+      "hardwareIdPrefix": "PCI\\VEN_8086&DEV_0416&SUBSYS_07811025",
+      "driverVersion": "10.18.15.4248",
+      "driverDate": "2015-08-04"
+    },
+    {
+      "name": "NVIDIA GeForce GT 750M",
+      "hardwareIdPrefix": "PCI\\VEN_10DE&DEV_0FE4&SUBSYS_07811025",
+      "driverVersion": "21.21.13.7654",
+      "driverDate": "2016-12-29"
+    }
+  ],
+  "memory": {
+    "installedGB": 8,
+    "moduleManufacturer": "Kingston",
+    "partNumber": "KVR16LS11/8",
+    "moduleCount": 1,
+    "speedMHz": 1600,
+    "reportedMemoryArrayDevices": 4,
+    "reportedMaximumGB": 32,
+    "maximumRequiresIndependentValidation": true
+  },
+  "storage": [
+    {
+      "model": "Apacer AS340 120GB",
+      "role": "Windows system drive",
+      "type": "SSD"
+    },
+    {
+      "model": "Seagate ST500LT012-9WS142",
+      "role": "games and data drive",
+      "type": "HDD"
+    }
+  ],
+  "connectivity": [
+    {
+      "name": "Qualcomm Atheros AR5BWB222",
+      "hardwareIdPrefix": "PCI\\VEN_168C&DEV_0034&SUBSYS_E052105B",
+      "driverVersion": "10.0.0.352"
+    },
+    {
+      "name": "Broadcom NetLink Gigabit Ethernet",
+      "hardwareIdPrefix": "PCI\\VEN_14E4&DEV_1692&SUBSYS_07811025",
+      "driverVersion": "15.6.1.3"
+    },
+    {
+      "name": "Qualcomm Atheros Bluetooth USB Module",
+      "hardwareIdPrefix": "USB\\VID_0489&PID_E04E",
+      "driverVersion": "10.0.1.7"
+    }
+  ],
   "safetyConstraints": {
     "modifyBiosOrUefi": false,
     "modifyVbiosOrFirmware": false,
     "changeVoltageOrOverclock": false,
-    "disableThermalProtection": false,
+    "changeThermalLimits": false,
     "disableDriverSignatureEnforcement": false,
-    "disableWindowsSecurity": false
+    "disableWindowsSecurity": false,
+    "allowUnverifiedDriverInstall": false
   },
-  "important": "This profile must never be used alone to select, force, or install a driver. Live hardware IDs and the exact OS build are mandatory."
+  "important": "This profile records inventory evidence only. It must never be used alone to select or force-install a driver."
 }
