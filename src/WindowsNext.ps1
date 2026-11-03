@@ -28,15 +28,17 @@ try {
     ) | Set-Content -LiteralPath $logPath -Encoding UTF8
 
     Write-Host ''
-    Write-Host 'Windows Next — hardware and driver inventory' -ForegroundColor Cyan
+    Write-Host 'Windows Next — hardware inventory and component compatibility' -ForegroundColor Cyan
     Write-Host 'Mode: READ ONLY. No drivers or Windows settings will be changed.'
     Write-Host ''
 
     $moduleDirectory = Join-Path $PSScriptRoot 'Modules'
     $inventoryModule = Join-Path $moduleDirectory 'Inventory.psm1'
     $reportModule = Join-Path $moduleDirectory 'Report.psm1'
+    $componentPlanModule = Join-Path $moduleDirectory 'ComponentPlan.psm1'
+    $manifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'manifest\components.json'
 
-    foreach ($requiredFile in @($inventoryModule, $reportModule)) {
+    foreach ($requiredFile in @($inventoryModule, $reportModule, $componentPlanModule, $manifestPath)) {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
             throw ('Required project file is missing: {0}' -f $requiredFile)
         }
@@ -44,9 +46,11 @@ try {
 
     Import-Module $inventoryModule -Force -ErrorAction Stop
     Import-Module $reportModule -Force -ErrorAction Stop
+    Import-Module $componentPlanModule -Force -ErrorAction Stop
 
     $audit = Get-WnAudit
-    $report = Export-WnAuditReport -Audit $audit -OutputDirectory $OutputDirectory
+    $componentPlan = Get-WnComponentPlan -Audit $audit -ManifestPath $manifestPath
+    $report = Export-WnAuditReport -Audit $audit -ComponentPlan $componentPlan -OutputDirectory $OutputDirectory
 
     @(
         ('Status: SUCCESS')
