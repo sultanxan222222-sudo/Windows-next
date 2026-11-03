@@ -49,10 +49,19 @@ jobs:
             throw "Expected installer EXE was not produced."
           }
 
+      - name: Generate SHA-256 checksum
+        shell: pwsh
+        run: |
+          $installer = '.\dist\WindowsNext-Setup-0.2.0.exe'
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath '.\dist\WindowsNext-Setup-0.2.0.exe.sha256' -Value "$hash  WindowsNext-Setup-0.2.0.exe" -Encoding ASCII
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: WindowsNext-Setup-0.2.0
-          path: dist/WindowsNext-Setup-0.2.0.exe
+          path: |
+            dist/WindowsNext-Setup-0.2.0.exe
+            dist/WindowsNext-Setup-0.2.0.exe.sha256
           if-no-files-found: error
           retention-days: 30
