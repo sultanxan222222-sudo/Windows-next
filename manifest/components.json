@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "project": "Windows Next",
+  "manifestStatus": "planning-only",
+  "globalInstallPolicy": "blocked-until-reviewed",
+  "targetOs": {
+    "family": "Windows",
+    "requiredArchitecture": "x64",
+    "exactBuildMustBeChecked": true
+  },
+  "components": [
+    {
+      "id": "intel-hd-graphics",
+      "displayName": "Intel HD Graphics",
+      "vendor": "Intel",
+      "status": "blocked",
+      "approvedPackages": [],
+      "requiredEvidence": [
+        "Exact live PCI hardware ID including subsystem identity",
+        "Exact Windows edition, version, and build",
+        "Official package source and release notes",
+        "Package and catalog signature verification",
+        "SHA-256 recorded in the release manifest",
+        "Documented compatibility and rollback plan"
+      ],
+      "reason": "No driver package is approved before the live inventory is reviewed."
+    },
+    {
+      "id": "nvidia-geforce",
+      "displayName": "NVIDIA GeForce",
+      "vendor": "NVIDIA",
+      "status": "blocked",
+      "approvedPackages": [],
+      "requiredEvidence": [
+        "Exact live PCI hardware ID including subsystem identity",
+        "Exact Windows edition, version, and build",
+        "Official package source and supported product list",
+        "Package and catalog signature verification",
+        "SHA-256 recorded in the release manifest",
+        "Documented compatibility and rollback plan"
+      ],
+      "reason": "No driver package is approved before the live inventory is reviewed."
+    }
+  ]
+}
