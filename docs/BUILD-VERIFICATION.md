@@ -1,21 +1,44 @@
-# First installer release gate
+# Windows Next 0.5.0 — build and acceptance record
 
-This document records the validation requirements for the first Windows Next EXE. It does not claim that a binary has already passed them.
+## Automated release checks
 
-## Required automated checks
+The current CI workflow runs on a Windows GitHub Actions runner:
 
-- Parse all PowerShell entry points and modules.
-- Run Pester inventory, report, and fail-closed component-plan tests.
-- Compile `installer/WindowsNext.iss` with Inno Setup 6 on a Windows runner.
-- Confirm the EXE and its SHA-256 sidecar were uploaded as the workflow artifact.
+1. Installs PSScriptAnalyzer and Pester.
+2. Parses and analyzes every PowerShell script and module, failing on analyzer errors.
+3. Runs the Pester suite, including checks for:
+   - source syntax and task entry points;
+   - read-only performance and report functions;
+   - fail-closed component manifest;
+   - startup-entry backup, disable, and restore;
+   - Visual C++ runtime source/signature safeguards;
+   - .NET Framework 3.5 DISM feature setup and no forced reboot;
+   - exact Hardware ID / newer driver-date rules;
+   - post-install Device Manager verification guards;
+   - Windows Update driver-category-only search.
+4. Compiles the single Inno Setup EXE.
+5. Creates a SHA-256 checksum and uploads both files as a workflow artifact.
 
-## Required manual target-machine checks
+The version and artifact filename are read from `installer/WindowsNext.iss`, avoiding a hard-coded version mismatch.
 
-- Install on the target Acer Aspire V3-772 and verify the Program Files location and Start Menu shortcut.
-- Run the diagnostic entry point and confirm the report includes OS lifecycle warnings, graphics, storage, RAM, Wi-Fi, Ethernet, and Bluetooth.
-- Verify installation does not modify drivers, Windows security, firmware, power settings, or thermal limits.
-- Uninstall and confirm the tool removes its own installed files without deleting user reports.
+## Manual acceptance required on the Acer Aspire V3-772
 
-## Release status
+The hosted CI runner is not the user's laptop. The following must be checked on the actual machine before claiming hardware acceptance:
 
-The first installer milestone is an installer for the Windows Next application itself. It is not yet an offline driver bundle or automatic system optimizer. Third-party driver installation remains disabled until exact package, signature, operating-system applicability, rollback, and target-hardware tests are approved.
+- Install the one-file EXE, open Windows Next, close it, and uninstall it.
+- Confirm all tabs open and Russian labels are readable.
+- Check that driver inventory lists the expected Intel HD 4600, NVIDIA GT 750M, WLAN, Ethernet, and Bluetooth IDs.
+- Run a read-only Windows Update driver search and confirm every result is exact-ID matched. A result list of zero is valid and safer than an unsupported driver.
+- Do not test driver installation on the target unless a candidate is independently confirmed, a restore point is available, and the laptop is on AC power.
+- Verify the startup backup/restore with a harmless nonessential user startup entry.
+- Verify Visual C++ package signatures on the live machine; only install when a component is missing or older.
+- Verify .NET Framework 3.5 state; enable it only when an older application actually needs it.
+- Check SSD/HDD maintenance actions and Windows repair only after creating the required restore point.
+
+## Current limitations
+
+- No third-party driver bundle is approved for this exact Windows 11 21H2 laptop.
+- Windows 11 Pro 21H2 is out of servicing and the i5-4200M is not an officially supported Windows 11 CPU. Windows Next does not bypass the CPU requirement or perform a feature upgrade.
+- Intel HD 4600 and NVIDIA GT 750M are legacy graphics devices. The app will not downgrade the Intel driver to restore a DirectX feature or force an unsupported NVIDIA package.
+- The installer currently has no trusted publisher code-signing certificate.
+- CI success proves source checks and EXE compilation; it does not prove runtime behavior, driver update availability, or hardware acceptance on the physical Acer.

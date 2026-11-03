@@ -1,5 +1,5 @@
 #define ProductName "Windows Next"
-#define ProductVersion "0.3.0"
+#define ProductVersion "0.5.0"
 #define ProductPublisher "Windows Next Project"
 
 [Setup]
@@ -13,8 +13,8 @@ DisableProgramGroupPage=yes
 OutputDir=..\dist
 OutputBaseFilename=WindowsNext-Setup-{#ProductVersion}
 UninstallDisplayName={#ProductName}
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 WizardStyle=modern
 Compression=lzma2
@@ -22,7 +22,7 @@ SolidCompression=yes
 UsePreviousAppDir=yes
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion=0.3.0.0
+VersionInfoVersion=0.5.0.0
 VersionInfoCompany={#ProductPublisher}
 VersionInfoDescription=Windows Next desktop maintenance suite
 VersionInfoProductName={#ProductName}

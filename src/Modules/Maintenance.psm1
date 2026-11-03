@@ -64,9 +64,10 @@ function Invoke-WnTempCleanup {
     [int]$deleted = 0
     [int]$skipped = 0
 
-    # The cleanup is deliberately restricted to the current user's LocalAppData\Temp.
+    # The cleanup is deliberately restricted to files directly inside the current user's LocalAppData\Temp.
+    # It does not recurse into subfolders, so junctions and symbolic links cannot redirect cleanup outside Temp.
     # Files newer than 14 days, reparse points, and inaccessible/in-use files are retained.
-    $files = @(Get-ChildItem -LiteralPath $tempRoot -File -Recurse -Force -ErrorAction SilentlyContinue)
+    $files = @(Get-ChildItem -LiteralPath $tempRoot -File -Force -ErrorAction SilentlyContinue)
     foreach ($file in $files) {
         try {
             if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
@@ -223,10 +224,11 @@ function Invoke-WnMaintenanceAction {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint')]
+        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint', 'InstallVCRuntime', 'InstallNetFx3', 'CheckDriverUpdates', 'InstallSelectedDriver')]
         [string]$Action,
         [string]$Destination,
-        [string]$DriveLetter
+        [string]$DriveLetter,
+        [string]$SelectionFile
     )
 
     $logPath = New-WnTaskLog -Action $Action
@@ -240,6 +242,51 @@ function Invoke-WnMaintenanceAction {
             'CheckWindows' { Invoke-WnWindowsHealthCheck -LogPath $logPath }
             'RepairWindows' { Invoke-WnWindowsRepair -LogPath $logPath }
             'CreateRestorePoint' { Invoke-WnCreateRestorePoint -LogPath $logPath }
+            'InstallVCRuntime' { Invoke-WnInstallVCRuntime -LogPath $logPath }
+            'InstallNetFx3' { Invoke-WnEnableNetFx3 -LogPath $logPath }
+            'CheckDriverUpdates' {
+                $candidates = @(Get-WnWindowsUpdateDriverCandidates)
+                Write-WnTaskLog -Path $logPath -Message ('Windows Update returned {0} candidates that match an exact Hardware ID and have a newer driver date.' -f $candidates.Count)
+                [pscustomobject]@{ CandidateCount=$candidates.Count; Candidates=$candidates }
+            }
+            'InstallSelectedDriver' {
+                if (-not (Test-WnAdministrator)) { throw 'Driver installation requires administrator rights.' }
+                if ([string]::IsNullOrWhiteSpace($SelectionFile)) { throw 'Driver selection file is missing.' }
+
+                $selectionRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WindowsNext\Selections')).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+                $selectionPath = [IO.Path]::GetFullPath($SelectionFile)
+                if (-not $selectionPath.StartsWith($selectionRoot,[StringComparison]::OrdinalIgnoreCase)) { throw 'Driver selection file is outside the Windows Next selection folder.' }
+                if (-not (Test-Path -LiteralPath $selectionPath -PathType Leaf)) { throw 'Driver selection file was not found.' }
+
+                $selection = Get-Content -LiteralPath $selectionPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                $ids = @($selection.UpdateIds | ForEach-Object { [string]$_ })
+                if ($ids.Count -ne 1) { throw 'Exactly one driver must be selected per operation. Install, restart if required, and test before choosing the next driver.' }
+                $parsedId = [guid]::Empty
+                if (-not [guid]::TryParse($ids[0],[ref]$parsedId)) { throw 'The selected Windows Update ID is invalid.' }
+
+                $systemDrive = $env:SystemDrive
+                $systemDisk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter ("DeviceID='{0}'" -f $systemDrive) -ErrorAction Stop
+                if ($null -eq $systemDisk -or [long]$systemDisk.FreeSpace -lt 2GB) { throw 'At least 2 GB of free space is required on the Windows drive. No driver was changed.' }
+
+                try {
+                    $stillAvailable = @(Get-WnWindowsUpdateDriverCandidates | Where-Object { [guid]$_.UpdateId -eq $parsedId })
+                    if ($stillAvailable.Count -ne 1) { throw 'The selected driver is no longer applicable. No driver was changed.' }
+
+                    $backupFolder = Join-Path ([Environment]::GetFolderPath('MyDocuments')) ('WindowsNext\DriverBackup\Before-WU-{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+                    $backup = Invoke-WnDriverBackup -Destination $backupFolder -LogPath $logPath
+                    $restore = Invoke-WnCreateRestorePoint -LogPath $logPath
+                    $installed = Install-WnWindowsUpdateDriver -UpdateId $parsedId -LogPath $logPath
+                    [pscustomobject]@{
+                        BackupPath = $backup.Destination
+                        DriverPackageCount = $backup.PackageCount
+                        RestorePointCreated = [bool]$restore.RestorePointCreated
+                        Installation = $installed
+                    }
+                }
+                finally {
+                    Remove-Item -LiteralPath $selectionPath -Force -ErrorAction SilentlyContinue
+                }
+            }
         }
         Write-WnTaskLog -Path $logPath -Message 'Task completed successfully.'
         return [pscustomobject]@{ Success = $true; Action = $Action; LogPath = $logPath; Result = $result; Error = $null }

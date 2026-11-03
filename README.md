@@ -4,7 +4,7 @@
 
 ## What the desktop app does
 
-The application is a Russian-language Windows Forms desktop program with four areas: system overview, maintenance, driver inventory/backup, and logs.
+The application is a Russian-language Windows Forms desktop program with seven areas: system overview, maintenance, driver inventory/backup, Windows Update driver search, software libraries, user startup management, and logs.
 
 - **Temporary-file cleanup:** removes only the current user's LocalAppData\Temp files older than 14 days. It does not clean Downloads, Documents, Windows folders, or recent files.
 - **Drive optimization:** invokes Windows' own Optimize-Volume operation on any selected fixed local volume, so the SSD and HDD can be handled separately. Windows decides whether to issue SSD optimization/TRIM or an HDD optimization.
@@ -14,6 +14,8 @@ The application is a Russian-language Windows Forms desktop program with four ar
 - **Restore point:** creates a named Windows restore point when System Protection is available.
 - **Driver backup:** exports third-party Windows driver packages to Documents\WindowsNext\DriverBackup, writes a CSV/JSON index, and calculates SHA-256 for each exported file.
 - **Device view:** shows current display, network, and Bluetooth driver versions and hardware IDs.
+- **Software libraries:** checks Visual C++ v14 x86/x64 and installs only official Microsoft packages after signature verification. It can also enable the built-in .NET Framework 3.5 feature for older applications after confirmation.
+- **Driver updates:** searches only the Windows Update driver category. It offers an update only when the Windows Update package's Hardware ID exactly matches a live device ID and its driver date is newer than the installed driver date. The user selects one package at a time. Before installation, Windows Next exports current third-party drivers and requires a successful restore point. After installation, it checks the new device driver date and Device Manager status when no reboot is required. It never restarts Windows automatically.
 - **Reports and logs:** keeps readable records under %LOCALAPPDATA%\WindowsNext.
 
 System-level tasks ask for UAC elevation separately. The app stays responsive while the task runs and checks its result.
@@ -32,15 +34,19 @@ The initial inventory is recorded in `manifest/profiles/acer-aspire-v3-772.json`
 
 ## Driver and system upgrade policy
 
-The component manifest is fail-closed. It currently contains **no approved unattended third-party driver packages** for this exact Windows 11 build. The application therefore inventories and backs up drivers but does not replace them. This is deliberate: driver names and newer version numbers alone are not sufficient proof of compatibility.
+The component manifest is fail-closed and contains **no approved third-party driver bundles** for this exact Windows 11 build. A separate Windows Update tab can offer only driver-category updates returned by Windows' own configured update service, with an exact live Hardware ID match and a strictly newer driver date. It installs one selected update at a time after a driver export and restore point; after a no-reboot install it verifies the driver date, signature, and Device Manager status. If no candidate passes, no driver is changed.
 
 Windows 11 Pro 21H2 is out of servicing. A supported OS path is a separate engineering gate; Windows Next does not force an upgrade or bypass processor requirements. BIOS, UEFI, VBIOS, device firmware, voltage, clocks, fan controls, thermal limits, driver signature enforcement, Windows Defender, and Secure Boot are never modified.
 
 ## Build and package
 
-The GitHub Actions workflow `/.github/workflows/build-installer.yml` runs PowerShell analysis and Pester tests, then compiles a single Inno Setup EXE and uploads its SHA-256 sidecar.
+The GitHub Actions workflows run PowerShell analysis and Pester tests, then compile a single Inno Setup EXE and upload its SHA-256 sidecar. See `docs/BUILD-VERIFICATION.md` for automated checks and the manual acceptance work that still requires the physical Acer.
 
-Current product version: **0.3.0**.
+Current development version: **0.5.0**.
+
+## Performance assessment
+
+The dashboard includes a read-only assessment of memory modules, Windows-volume free space, common Run-key entries, and Windows build. The separate startup tab can disable only selected current-user Run entries after making a backup; machine-wide entries remain read-only. This can reduce the number of apps launched at sign-in, but the user must identify unnecessary items. The Visual C++ runtime and .NET Framework 3.5 are application prerequisites, not performance boosters. Windows Next does not promise a frame-rate or speed increase.
 
 For local compilation on Windows with Inno Setup 6:
 
@@ -48,7 +54,7 @@ For local compilation on Windows with Inno Setup 6:
 & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" .\installer\WindowsNext.iss
 ```
 
-The build output is `dist\WindowsNext-Setup-0.3.0.exe`.
+The build output is `dist\WindowsNext-Setup-<version>.exe`.
 
 ## Safety boundaries
 
@@ -56,9 +62,9 @@ The build output is `dist\WindowsNext-Setup-0.3.0.exe`.
 - No voltage, overclocking, thermal-limit, or fan-safety changes.
 - No disabling Defender, Windows Update, Secure Boot, or driver-signature enforcement.
 - No forced installation of unknown drivers and no opaque registry/debloat bundles.
-- Changes are user-confirmed, logged, and limited to built-in Windows maintenance commands.
+- Changes are user-confirmed and logged. Software installs use official Windows/Microsoft servicing paths; startup changes are limited to current-user Run entries with exact backup; driver updates use only the guarded Windows Update workflow.
 - Do not claim zero risk. Repair functions can alter system files and must be explicitly confirmed.
 
 ## Development state
 
-The desktop maintenance center is the first functional product milestone. The next work is controlled software/component deployment, supported OS servicing assessment, additional hardware modules (chipset, audio, USB, touchpad, camera), and before/after performance measurements. A feature is not considered complete until its operation and rollback behavior are tested on the target Acer.
+Current development includes the maintenance center, read-only hardware/performance assessment, reversible current-user startup controls, a signature-checked Microsoft Visual C++ v14 installer, and a tightly gated Windows Update driver path. No third-party driver package has passed exact hardware-ID and Windows-build validation for this laptop. Windows Update may return no candidates on this out-of-servicing Windows 11 21H2 build. The app has not yet passed install/use/uninstall acceptance testing on the physical Acer; CI success alone is not hardware acceptance.

@@ -4,6 +4,10 @@ BeforeAll {
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Report.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\ComponentPlan.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Performance.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Startup.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Force
 }
 
 Describe 'Windows Next source validation' {
@@ -43,6 +47,20 @@ Describe 'Windows Next source validation' {
     It 'exposes the read-only inventory and component planner' {
         (Get-Command Get-WnAudit -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
         (Get-Command Get-WnComponentPlan -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
+    }
+
+    It 'provides a read-only performance assessment without changing settings' {
+        $assessment = Get-WnPerformanceAssessment
+        $assessment.Mode | Should -Be 'ReadOnly'
+        $assessment.ChangesMade | Should -BeFalse
+        $assessment.Findings.Count | Should -BeGreaterThan 0
+        ($assessment.Findings | Where-Object { $_.Area -eq 'Автозагрузка' }).Count | Should -Be 1
+    }
+
+    It 'shows performance assessment in the main dashboard' {
+        $app = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\\WindowsNext.ps1') -Raw
+        $app | Should -Match 'Get-WnPerformanceAssessment'
+        $app | Should -Match 'ОЦЕНКА ПРОИЗВОДИТЕЛЬНОСТИ'
     }
 
     It 'exports JSON and TXT reports from a supplied fixture' {
@@ -125,4 +143,113 @@ Describe 'Windows Next source validation' {
         $plan.Components[0].Decision | Should -Be 'KEEP_CURRENT'
         $plan.Components[0].AutomaticInstall | Should -BeFalse
     }
+
+    It 'backs up and restores a user startup entry without overwriting an existing value' {
+        $backupDirectory = Join-Path $TestDrive 'startup-backups'
+        $valueName = 'WindowsNext-Pester-' + [guid]::NewGuid().ToString('N')
+        $originalValue = '"C:\Windows\System32\notepad.exe" --windows-next-test'
+        $registryPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+        $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($registryPath)
+        try {
+            $key.SetValue($valueName, $originalValue, [Microsoft.Win32.RegistryValueKind]::ExpandString)
+            $entry = @(Get-WnStartupEntries | Where-Object { $_.Name -eq $valueName })
+            $entry.Count | Should -Be 1
+            $entry[0].CanDisable | Should -BeTrue
+
+            $disabled = Disable-WnStartupEntry -Entry $entry[0] -BackupDirectory $backupDirectory
+            $disabled.Disabled | Should -BeTrue
+            $key.GetValueNames() | Should -Not -Contain $valueName
+            Test-Path -LiteralPath $disabled.BackupFile | Should -BeTrue
+
+            $restored = Restore-WnStartupEntry -BackupFile $disabled.BackupFile -BackupDirectory $backupDirectory
+            $restored.Restored | Should -BeTrue
+            $key.GetValue($valueName, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) | Should -Be $originalValue
+            $key.GetValueKind($valueName) | Should -Be ([Microsoft.Win32.RegistryValueKind]::ExpandString)
+        }
+        finally {
+            $key.DeleteValue($valueName, $false)
+            $key.Dispose()
+        }
+    }
+
+    It 'refuses to disable machine-wide startup entries' {
+        $entry = [pscustomobject]@{
+            Name = 'ProtectedMachineEntry'
+            Command = 'example.exe'
+            RegistryPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'
+            CanDisable = $false
+        }
+        { Disable-WnStartupEntry -Entry $entry -BackupDirectory (Join-Path $TestDrive 'blocked') } | Should -Throw
+    }
+
+
+    It 'reports Visual C++ x86 and x64 runtime status without changing the system' {
+        $status = @(Get-WnVCRuntimeStatus)
+        $status.Count | Should -Be 2
+        ($status | Where-Object { $_.Architecture -eq 'x86' }).Count | Should -Be 1
+        ($status | Where-Object { $_.Architecture -eq 'x64' }).Count | Should -Be 1
+        ($status | Where-Object { $_.RegistryPath -notmatch '^HKLM:' }).Count | Should -Be 0
+    }
+
+    It 'uses Microsoft-owned HTTPS endpoints for Visual C++ runtime packages' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Raw
+        $module | Should -Match 'https://aka\.ms/vc14/vc_redist\.x64\.exe'
+        $module | Should -Match 'https://aka\.ms/vc14/vc_redist\.x86\.exe'
+        $module | Should -Match 'Get-AuthenticodeSignature'
+        $module | Should -Match 'Microsoft Corporation'
+    }
+
+
+    It 'accepts only an exact hardware ID with a newer Windows Update driver date' {
+        $deviceId = 'PCI\VEN_8086&DEV_0416&SUBSYS_07811025&REV_06'
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId,'PCI\VEN_8086&DEV_0416') -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2015-08-04') -UpdateDriverDate ([datetime]'2020-01-01') | Should -BeTrue
+    }
+
+    It 'rejects compatible or partial hardware IDs instead of treating them as exact matches' {
+        $deviceId = 'PCI\VEN_8086&DEV_0416&SUBSYS_07811025&REV_06'
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId 'PCI\VEN_8086&DEV_0416' -CurrentDriverDate ([datetime]'2015-08-04') -UpdateDriverDate ([datetime]'2020-01-01') | Should -BeFalse
+    }
+
+    It 'rejects Windows Update drivers with an equal or older driver date' {
+        $deviceId = 'PCI\VEN_10DE&DEV_0FE4&SUBSYS_07811025'
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2016-12-29') -UpdateDriverDate ([datetime]'2016-12-29') | Should -BeFalse
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2016-12-29') -UpdateDriverDate ([datetime]'2014-01-01') | Should -BeFalse
+    }
+
+    It 'verifies the resulting driver date and Device Manager status after installation' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Raw
+        $module | Should -Match 'NewerThanPreviousDriver'
+        $module | Should -Match 'DeviceManagerStatusOK'
+        $module | Should -Match 'ConfigManagerErrorCode'
+        $module | Should -Match 'DriverSignaturePresent'
+        $module | Should -Match '\$session\.CreateUpdateDownloader\(\)'
+        $module | Should -Match '\$session\.CreateUpdateInstaller\(\)'
+    }
+
+    It 'restricts automated driver discovery to Windows Update driver entries' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Raw
+        $module | Should -Match "IsInstalled=0 and Type='Driver' and IsHidden=0"
+        $module | Should -Match 'IncludePotentiallySupersededUpdates'
+        $module | Should -Match 'Install-WnWindowsUpdateDriver'
+        $maintenance = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Raw
+        $maintenance | Should -Match 'At least 2 GB of free space'
+    }
+
+
+    It 'enables only the built-in NetFx3 optional feature without forcing a reboot' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Raw
+        $module | Should -Match '/Enable-Feature'
+        $module | Should -Match '/FeatureName:NetFx3'
+        $module | Should -Match '/NoRestart'
+        $module | Should -Match 'Get-WindowsOptionalFeature'
+        $module | Should -Match 'NetFx3 state after operation'
+    }
+
+
+    It 'does not recurse into Temp subfolders or junctions during cleanup' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Raw
+        $module | Should -Match 'Get-ChildItem -LiteralPath \$tempRoot -File -Force'
+        $module | Should -Not -Match 'Get-ChildItem -LiteralPath \$tempRoot -File -Recurse'
+    }
+
 }

@@ -1,11 +1,12 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
- [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint')]
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint','InstallVCRuntime','InstallNetFx3','CheckDriverUpdates','InstallSelectedDriver')]
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
- [string]$ResultFile=''
+ [string]$ResultFile='',
+ [string]$SelectionFile=''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -14,14 +15,14 @@ $script:ReportsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Reports'
 $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 [void][IO.Directory]::CreateDirectory($script:ReportsPath)
 [void][IO.Directory]::CreateDirectory($script:LogsPath)
-$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1')
+$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Components.psm1','DriverUpdates.psm1','Maintenance.psm1','Performance.psm1','Startup.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
  if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
  Import-Module $path -Force -ErrorAction Stop
 }
 if (-not [string]::IsNullOrWhiteSpace($Task)){
- $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter
+ $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter -SelectionFile $SelectionFile
  if (-not [string]::IsNullOrWhiteSpace($ResultFile)){
   $parent=Split-Path -Parent $ResultFile
   [void][IO.Directory]::CreateDirectory($parent)
@@ -75,6 +76,10 @@ function Get-WnOverview{
  foreach($x in @($audit.Memory.Modules)){$lines.Add(('{0} | {1} ГБ | {2} МГц | {3}' -f $x.Manufacturer,$x.CapacityGB,$x.SpeedMHz,$x.PartNumber))}
  $lines.Add('');$lines.Add('СЕТЬ / BLUETOOTH')
  foreach($x in @($audit.NetworkDevices)){$lines.Add(('{0} | {1} | {2}' -f $x.Name,$x.Class,$x.DriverVersion))}
+ $performance=Get-WnPerformanceAssessment
+ $lines.Add('');$lines.Add('ОЦЕНКА ПРОИЗВОДИТЕЛЬНОСТИ (БЕЗ ИЗМЕНЕНИЙ)')
+ foreach($finding in @($performance.Findings)){$lines.Add(('{0} — {1}: {2}' -f $finding.Area,$finding.Status,$finding.Detail))}
+ $lines.Add('Режим оценки: только чтение. Настройки Windows не изменялись.')
  $lines.Add('');$lines.Add('СОВМЕСТИМОСТЬ КОМПОНЕНТОВ')
  foreach($w in @($plan.Warnings)){$lines.Add(('ВНИМАНИЕ: {0}' -f $w))}
  foreach($x in @($plan.Components)){$lines.Add(('{0}: {1}' -f $x.DisplayName,$x.Decision))}
@@ -114,6 +119,86 @@ function Update-WnVolumePicker{
   if($items.DriveLetter -contains $target){$volumePicker.SelectedValue=$target}else{$volumePicker.SelectedIndex=0}
  }
 }
+function Update-WnDriverCandidateGrid {
+ param([object[]]$Candidates=@())
+ $table=New-Object System.Data.DataTable
+ [void]$table.Columns.Add('Selected',[bool])
+ [void]$table.Columns.Add('Driver',[string])
+ [void]$table.Columns.Add('Manufacturer',[string])
+ [void]$table.Columns.Add('Model',[string])
+ [void]$table.Columns.Add('Provider',[string])
+ [void]$table.Columns.Add('Class',[string])
+ [void]$table.Columns.Add('Date',[string])
+ [void]$table.Columns.Add('CurrentVersion',[string])
+ [void]$table.Columns.Add('HardwareId',[string])
+ [void]$table.Columns.Add('UpdateId',[string])
+ foreach($candidate in $Candidates){
+  [void]$table.Rows.Add($false,[string]$candidate.Title,[string]$candidate.Manufacturer,[string]$candidate.Model,[string]$candidate.Provider,[string]$candidate.DriverClass,[string]$candidate.DriverDate,[string]$candidate.CurrentDriverVersion,[string]$candidate.HardwareId,[string]$candidate.UpdateId)
+ }
+ $driverUpdateGrid.DataSource=$table
+ foreach($column in $driverUpdateGrid.Columns){$column.ReadOnly=$true}
+ $driverUpdateGrid.Columns['Selected'].ReadOnly=$false
+ $driverUpdateGrid.Columns['Selected'].HeaderText='Выбрать'
+ $driverUpdateGrid.Columns['Driver'].HeaderText='Драйвер'
+ $driverUpdateGrid.Columns['Manufacturer'].HeaderText='Производитель'
+ $driverUpdateGrid.Columns['Model'].HeaderText='Модель'
+ $driverUpdateGrid.Columns['Provider'].HeaderText='Поставщик'
+ $driverUpdateGrid.Columns['Class'].HeaderText='Класс'
+ $driverUpdateGrid.Columns['Date'].HeaderText='Дата пакета'
+ $driverUpdateGrid.Columns['CurrentVersion'].HeaderText='Установленная версия'
+ $driverUpdateGrid.Columns['HardwareId'].HeaderText='Точный Hardware ID'
+ $driverUpdateGrid.Columns['UpdateId'].Visible=$false
+}
+function Update-WnComponents {
+ $lines=New-Object 'System.Collections.Generic.List[string]'
+ $lines.Add('WINDOWS NEXT — ПРОВЕРКА ИГРОВЫХ БИБЛИОТЕК')
+ $lines.Add(('Проверено: {0}' -f (Get-Date -Format 'dd.MM.yyyy HH:mm:ss')))
+ foreach($item in @(Get-WnVCRuntimeStatus)){
+  $version=[string]$item.Version
+  if([string]::IsNullOrWhiteSpace($version)){$version='не установлена'}
+  $state=if($item.Installed){'Установлена'}else{'Не обнаружена'}
+  $lines.Add(('{0}: {1}; версия: {2}' -f $item.Architecture,$state,$version))
+ }
+ $lines.Add('')
+ $lines.Add('Visual C++ Runtime x86/x64 применяется многими играми и программами.')
+ $lines.Add('Windows Next загружает только официальные установщики Microsoft, проверяет действительную цифровую подпись Microsoft Corporation и SHA-256, пропускает уже более новую версию и удаляет временные установщики после завершения.')
+ $lines.Add('Это исправляет недостающие библиотеки приложений, но не повышает DirectX или возможности видеокарты и не обещает прирост FPS.')
+ $lines.Add('Нужен интернет. Установка выполняется только после подтверждения и запроса UAC.')
+ try{$netfx=Get-WnNetFx3Status;$lines.Add((' .NET Framework 3.5: {0}' -f $netfx.State))}catch{$lines.Add('.NET Framework 3.5: проверить не удалось — '+$_.Exception.Message)}
+ $lines.Add('Для старых программ и игр доступно отдельное включение штатной функции Windows .NET Framework 3.5. Данные и драйверы не затрагиваются; используется DISM и источник компонентов, настроенный в Windows.')
+ $componentInfo.Text=$lines -join [Environment]::NewLine
+}
+function Update-WnStartupGrid {
+ $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
+ [void][IO.Directory]::CreateDirectory($backupDirectory)
+ $table=New-Object System.Data.DataTable
+ [void]$table.Columns.Add('Selected',[bool])
+ [void]$table.Columns.Add('Name',[string])
+ [void]$table.Columns.Add('Command',[string])
+ [void]$table.Columns.Add('Scope',[string])
+ [void]$table.Columns.Add('Status',[string])
+ [void]$table.Columns.Add('CanDisable',[bool])
+ [void]$table.Columns.Add('Id',[string])
+ [void]$table.Columns.Add('BackupFile',[string])
+
+ foreach($entry in @(Get-WnStartupEntries)){
+  [void]$table.Rows.Add($false,[string]$entry.Name,[string]$entry.Command,[string]$entry.Scope,[string]$entry.Status,[bool]$entry.CanDisable,[string]$entry.Id,'')
+ }
+ foreach($backup in @(Get-WnStartupBackups -BackupDirectory $backupDirectory)){
+  [void]$table.Rows.Add($false,[string]$backup.Name,[string]$backup.Command,'Резервная копия',[string]$backup.Status,$false,'',[string]$backup.BackupFile)
+ }
+ $startupGrid.DataSource=$table
+ foreach($column in $startupGrid.Columns){$column.ReadOnly=$true}
+ $startupGrid.Columns['Selected'].ReadOnly=$false
+ $startupGrid.Columns['Selected'].HeaderText='Выбрать'
+ $startupGrid.Columns['Name'].HeaderText='Название'
+ $startupGrid.Columns['Command'].HeaderText='Команда запуска'
+ $startupGrid.Columns['Scope'].HeaderText='Область'
+ $startupGrid.Columns['Status'].HeaderText='Состояние'
+ $startupGrid.Columns['CanDisable'].Visible=$false
+ $startupGrid.Columns['Id'].Visible=$false
+ $startupGrid.Columns['BackupFile'].Visible=$false
+}
 function Update-WnLogs{
  $files=@(Get-ChildItem -LiteralPath $script:LogsPath -Filter 'WindowsNext-*.log' -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 12)
  $out=New-Object 'System.Collections.Generic.List[string]'
@@ -130,6 +215,40 @@ function Finish-WnTask([object]$Result){
    $message=('Удалено файлов: {0}; освобождено: {1} МБ; пропущено: {2}' -f $Result.Result.FilesDeleted,[math]::Round($Result.Result.BytesFreed/1MB,1),$Result.Result.Skipped)
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   }
+  if($Result.Action -eq 'InstallVCRuntime' -and $Result.Result){
+   $message='Проверенные библиотеки Visual C++:'
+   foreach($component in @($Result.Result.Components)){$message+=[Environment]::NewLine+('{0}: {1} ({2})' -f $component.Architecture,$component.Status,$component.Version)}
+   if($Result.Result.RebootRequired){$message+=[Environment]::NewLine+'Для завершения установки требуется перезагрузка.'}
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  if($Result.Action -eq 'InstallNetFx3' -and $Result.Result){
+   $message='.NET Framework 3.5: '+[string]$Result.Result.State
+   if($Result.Result.RebootRequired){$message+=[Environment]::NewLine+'Для завершения требуется перезагрузка. Автоматически перезагружать компьютер Windows Next не будет.'}
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  if($Result.Action -eq 'CheckDriverUpdates' -and $Result.Result){
+   $candidates=@($Result.Result.Candidates)
+   Update-WnDriverCandidateGrid -Candidates $candidates
+   if($candidates.Count -gt 0){$message=('Найдено подходящих драйверов: {0}. Выбери только один для установки.' -f $candidates.Count)}
+   else{$message='Windows Update не нашёл более новых драйверов с точным совпадением Hardware ID. Ничего не изменено.'}
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  if($Result.Action -eq 'InstallSelectedDriver' -and $Result.Result){
+   $installation=$Result.Result.Installation
+   $message='Установка драйвера через Windows Update завершена.'
+   $message+=[Environment]::NewLine+'Драйвер: '+[string]$installation.Title
+   $message+=[Environment]::NewLine+'Резервная копия: '+[string]$Result.Result.BackupPath
+   if($installation.RebootRequired){$message+=[Environment]::NewLine+'Требуется перезагрузка Windows. Она не будет выполняться автоматически.'}
+   else{
+    $message+=[Environment]::NewLine+'Перезагрузка не требуется. Проверка установленных устройств:'
+    foreach($device in @($installation.VerifiedDevices)){
+     $message+=[Environment]::NewLine+('{0}: версия {1}, дата {2}, устройство без ошибки, цифровая подпись есть' -f $device.DeviceName,$device.DriverVersion,$device.DriverDate)
+    }
+    $message+=[Environment]::NewLine+'Проверь работу устройства перед следующей установкой.'
+    try{Update-WnDrivers}catch{}
+   }
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
   if($Result.Action -eq 'ExportDrivers' -and $Result.Result){
    $message=('Экспортировано пакетов: {0}' -f $Result.Result.PackageCount)
    $message+=[Environment]::NewLine+'Папка: '+[string]$Result.Result.Destination
@@ -142,10 +261,10 @@ function Finish-WnTask([object]$Result){
   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Error')|Out-Null
  }
- $script:ActiveTask=$null;Update-WnLogs
+ $script:ActiveTask=$null;Update-WnLogs;try{Update-WnComponents}catch{}
 }
 function Start-WnTask{
- param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[switch]$Admin)
+ param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[string]$SelectionFile='',[switch]$Admin)
  if($null -ne $script:ActiveTask){[System.Windows.Forms.MessageBox]::Show('Уже выполняется другая задача.','Windows Next','OK','Information')|Out-Null;return}
  $resultDir=Join-Path $env:LOCALAPPDATA 'WindowsNext\Results'
  [void][IO.Directory]::CreateDirectory($resultDir)
@@ -154,6 +273,7 @@ function Start-WnTask{
  $argumentString='-NoLogo -NoProfile -WindowStyle Hidden -File "{0}" -Task {1} -ResultFile "{2}"' -f $PSCommandPath,$Action,$resultFile
  if($Destination){$argumentString+=' -Destination "{0}"' -f $Destination.Replace('"','')}
  if($Letter){$argumentString+=' -DriveLetter {0}' -f $Letter}
+ if($SelectionFile){$argumentString+=' -SelectionFile "{0}"' -f $SelectionFile.Replace('"','')}
  try{
   $start=@{FilePath=$powershell;ArgumentList=$argumentString;PassThru=$true;WindowStyle='Hidden'}
   if($Admin){$start.Verb='RunAs'}
@@ -161,7 +281,7 @@ function Start-WnTask{
   $script:ActiveTask=[pscustomobject]@{Process=$proc;ResultFile=$resultFile;Caption=$Caption}
   $status.Text=('Выполняется: {0}' -f $Caption);$script:TaskTimer.Start()
  }catch [System.ComponentModel.Win32Exception]{
-  if($_.Exception.NativeErrorCode -eq 1223){$status.Text='Запрос UAC отменён. Изменений не выполнено.'}
+  if($_.Exception.NativeErrorCode -eq 1223){if($SelectionFile){Remove-Item -LiteralPath $SelectionFile -Force -ErrorAction SilentlyContinue};$status.Text='Запрос UAC отменён. Изменений не выполнено.'}
   else{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
  }catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
 }
@@ -181,8 +301,11 @@ $tabs=New-Object System.Windows.Forms.TabControl;$tabs.Dock='Fill';$tabs.Font=Ne
 $home=New-Object System.Windows.Forms.TabPage;$home.Text='Главная';$home.BackColor=$script:Back
 $maint=New-Object System.Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
 $drivers=New-Object System.Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
+$driverUpdates=New-Object System.Windows.Forms.TabPage;$driverUpdates.Text='Поиск обновлений';$driverUpdates.BackColor=$script:Back
+$components=New-Object System.Windows.Forms.TabPage;$components.Text='Библиотеки';$components.BackColor=$script:Back
 $logs=New-Object System.Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
-[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$logs))
+$startup=New-Object System.Windows.Forms.TabPage;$startup.Text='Автозагрузка';$startup.BackColor=$script:Back
+[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$driverUpdates,$components,$startup,$logs))
 
 $homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object System.Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
 $homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
@@ -219,6 +342,42 @@ $driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing
 $driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
 $driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote);$driverPanel.Controls.SetChildIndex($driverBar,0);$driverPanel.Controls.SetChildIndex($driverNote,1)
 
+$driverUpdatePanel=New-Object System.Windows.Forms.Panel;$driverUpdatePanel.Dock='Fill';$driverUpdatePanel.Padding=New-Object System.Windows.Forms.Padding(12);$driverUpdates.Controls.Add($driverUpdatePanel)
+$driverUpdateBar=New-Object System.Windows.Forms.FlowLayoutPanel;$driverUpdateBar.Dock='Top';$driverUpdateBar.Height=54;$driverUpdatePanel.Controls.Add($driverUpdateBar)
+$driverUpdateSearch=New-WnButton 'Найти драйверы' 180
+$driverUpdateInstall=New-WnButton 'Установить один выбранный' 250
+$driverUpdateBar.Controls.AddRange(@($driverUpdateSearch,$driverUpdateInstall))
+$driverUpdateGrid=New-Object System.Windows.Forms.DataGridView;$driverUpdateGrid.Dock='Fill';$driverUpdateGrid.ReadOnly=$false
+$driverUpdateGrid.AllowUserToAddRows=$false;$driverUpdateGrid.AllowUserToDeleteRows=$false;$driverUpdateGrid.AutoSizeColumnsMode='Fill'
+$driverUpdateGrid.RowHeadersVisible=$false;$driverUpdateGrid.SelectionMode='FullRowSelect';$driverUpdateGrid.MultiSelect=$false
+$driverUpdateGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverUpdatePanel.Controls.Add($driverUpdateGrid)
+$driverUpdateNote=New-Object System.Windows.Forms.Label;$driverUpdateNote.Dock='Bottom';$driverUpdateNote.Height=58;$driverUpdateNote.ForeColor=$script:Muted
+$driverUpdateNote.Text='Поиск идёт через настроенный Windows Update и показывает только точные Hardware ID с более новой датой драйвера. Перед каждой установкой создаётся копия драйверов и точка восстановления. Устанавливается только один драйвер за операцию; автоматической перезагрузки нет. Если Windows Update не предлагает подходящий пакет, Windows Next ничего не устанавливает.'
+$driverUpdatePanel.Controls.Add($driverUpdateNote);$driverUpdatePanel.Controls.SetChildIndex($driverUpdateBar,0);$driverUpdatePanel.Controls.SetChildIndex($driverUpdateNote,1)
+
+$componentPanel=New-Object System.Windows.Forms.Panel;$componentPanel.Dock='Fill';$componentPanel.Padding=New-Object System.Windows.Forms.Padding(12);$components.Controls.Add($componentPanel)
+$componentBar=New-Object System.Windows.Forms.FlowLayoutPanel;$componentBar.Dock='Top';$componentBar.Height=54;$componentPanel.Controls.Add($componentBar)
+$componentRefresh=New-WnButton 'Проверить библиотеки' 210
+$componentInstall=New-WnButton 'Установить / обновить Visual C++' 300
+$componentNetFx=New-WnButton 'Включить .NET Framework 3.5' 250
+$componentBar.Controls.AddRange(@($componentRefresh,$componentInstall,$componentNetFx))
+$componentInfo=New-WnTextBox;$componentInfo.Dock='Fill';$componentPanel.Controls.Add($componentInfo);$componentPanel.Controls.SetChildIndex($componentBar,0)
+
+$startupPanel=New-Object System.Windows.Forms.Panel;$startupPanel.Dock='Fill';$startupPanel.Padding=New-Object System.Windows.Forms.Padding(12);$startup.Controls.Add($startupPanel)
+$startupBar=New-Object System.Windows.Forms.FlowLayoutPanel;$startupBar.Dock='Top';$startupBar.Height=54;$startupPanel.Controls.Add($startupBar)
+$startupRefresh=New-WnButton 'Обновить список' 180
+$startupDisable=New-WnButton 'Отключить выбранные' 220
+$startupRestore=New-WnButton 'Восстановить выбранные' 230
+$startupBar.Controls.AddRange(@($startupRefresh,$startupDisable,$startupRestore))
+$startupGrid=New-Object System.Windows.Forms.DataGridView;$startupGrid.Dock='Fill';$startupGrid.ReadOnly=$false
+$startupGrid.AllowUserToAddRows=$false;$startupGrid.AllowUserToDeleteRows=$false;$startupGrid.AutoSizeColumnsMode='Fill'
+$startupGrid.RowHeadersVisible=$false;$startupGrid.SelectionMode='FullRowSelect';$startupGrid.MultiSelect=$false
+$startupGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$startupPanel.Controls.Add($startupGrid)
+$startupNote=New-Object System.Windows.Forms.Label;$startupNote.Dock='Bottom';$startupNote.Height=48
+$startupNote.ForeColor=$script:Muted
+$startupNote.Text='Отключаются только выбранные записи автозагрузки текущего пользователя. Перед удалением создаётся копия; системная автозагрузка доступна только для просмотра.'
+$startupPanel.Controls.Add($startupNote);$startupPanel.Controls.SetChildIndex($startupBar,0);$startupPanel.Controls.SetChildIndex($startupNote,1)
+
 $logPanel=New-Object System.Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object System.Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
 $logBar=New-Object System.Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
 $logRefresh=New-WnButton 'Обновить журнал' 180;$logFolder=New-WnButton 'Папка журналов' 180;$logBar.Controls.AddRange(@($logRefresh,$logFolder))
@@ -247,7 +406,7 @@ $saveReport.Add_Click({
 })
 $openReports.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:ReportsPath)})
 $clean.Add_Click({
- $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
+ $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы старше 14 дней, лежащие непосредственно в %LOCALAPPDATA%\Temp? Вложенные папки, загрузки, документы и системные каталоги не затрагиваются.','Очистка','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
 })
 $refreshVolumes.Add_Click({Update-WnVolumePicker})
@@ -285,12 +444,86 @@ $backupFolder.Add_Click({
  $folder=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
  [void][IO.Directory]::CreateDirectory($folder);Start-Process explorer.exe -ArgumentList ('"{0}"' -f $folder)
 })
+$driverUpdateGrid.Add_CurrentCellDirtyStateChanged({
+ if($driverUpdateGrid.IsCurrentCellDirty){[void]$driverUpdateGrid.CommitEdit([System.Windows.Forms.DataGridViewDataErrorContexts]::Commit)}
+})
+$driverUpdateSearch.Add_Click({
+ if($null -ne $script:ActiveTask){return}
+ Update-WnDriverCandidateGrid
+ Start-WnTask -Action CheckDriverUpdates -Caption 'Поиск совместимых драйверов через Windows Update'
+})
+$driverUpdateInstall.Add_Click({
+ $selected=@($driverUpdateGrid.Rows|Where-Object{[bool]$_.Cells['Selected'].Value})
+ if($selected.Count -ne 1){[System.Windows.Forms.MessageBox]::Show('Отметь ровно один драйвер. Установка нескольких драйверов за раз запрещена.','Обновление драйверов','OK','Warning')|Out-Null;return}
+ $row=$selected[0]
+ $title=[string]$row.Cells['Driver'].Value
+ $hardwareId=[string]$row.Cells['HardwareId'].Value
+ $date=[string]$row.Cells['Date'].Value
+ $updateId=[string]$row.Cells['UpdateId'].Value
+ $choice=[System.Windows.Forms.MessageBox]::Show(('Установить этот драйвер через Windows Update?'+[Environment]::NewLine+[Environment]::NewLine+$title+[Environment]::NewLine+'Дата драйвера: '+$date+[Environment]::NewLine+'Hardware ID: '+$hardwareId+[Environment]::NewLine+[Environment]::NewLine+'Перед установкой Windows Next экспортирует текущие драйверы и создаст точку восстановления. Автоматической перезагрузки не будет.'),'Проверка драйвера','YesNo','Warning')
+ if($choice -ne [System.Windows.Forms.DialogResult]::Yes){return}
+ $selectionDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\Selections'
+ [void][IO.Directory]::CreateDirectory($selectionDirectory)
+ $selectionFile=Join-Path $selectionDirectory (([guid]::NewGuid().ToString('N'))+'.json')
+ @{UpdateIds=@($updateId)}|ConvertTo-Json -Depth 3|Set-Content -LiteralPath $selectionFile -Encoding UTF8
+ Start-WnTask -Action InstallSelectedDriver -Caption ('Установка драйвера: '+$title) -SelectionFile $selectionFile -Admin
+})
+$componentRefresh.Add_Click({try{Update-WnComponents}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$componentNetFx.Add_Click({
+ $choice=[System.Windows.Forms.MessageBox]::Show('Включить встроенную дополнительную функцию Windows .NET Framework 3.5? Она нужна некоторым старым программам и играм. Windows загрузит необходимые компоненты через настроенный источник Windows Update. Нужен интернет; автоматической перезагрузки не будет.','Дополнительная функция Windows','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action InstallNetFx3 -Caption 'Включение .NET Framework 3.5' -Admin}
+})
+$componentInstall.Add_Click({
+ $choice=[System.Windows.Forms.MessageBox]::Show('Загрузить официальные Microsoft Visual C++ Runtime x86 и x64, проверить цифровую подпись и установить только при отсутствии или более старой версии? Нужен интернет.','Игровые библиотеки','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action InstallVCRuntime -Caption 'Установка Microsoft Visual C++ Runtime' -Admin}
+})
 $logRefresh.Add_Click({Update-WnLogs})
 $logFolder.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:LogsPath)})
+$startupGrid.Add_CurrentCellDirtyStateChanged({
+ if($startupGrid.IsCurrentCellDirty){[void]$startupGrid.CommitEdit([System.Windows.Forms.DataGridViewDataErrorContexts]::Commit)}
+})
+$startupRefresh.Add_Click({try{Update-WnStartupGrid}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$startupDisable.Add_Click({
+ $selected=@($startupGrid.Rows|Where-Object{[bool]$_.Cells['Selected'].Value -and [bool]$_.Cells['CanDisable'].Value})
+ if($selected.Count -eq 0){[System.Windows.Forms.MessageBox]::Show('Выбери одну или несколько записей из раздела текущего пользователя.','Автозагрузка','OK','Information')|Out-Null;return}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Отключить выбранные программы при входе в Windows? Перед изменением будет создана резервная копия. Не отключай незнакомые компоненты безопасности, драйверы и системные средства.','Изменение автозагрузки','YesNo','Warning')
+ if($choice -ne [System.Windows.Forms.DialogResult]::Yes){return}
+ $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
+ $done=0;$errors=New-Object 'System.Collections.Generic.List[string]'
+ foreach($row in $selected){
+  try{
+   $id=[string]$row.Cells['Id'].Value
+   $entry=@(Get-WnStartupEntries|Where-Object{$_.Id -eq $id})
+   if($entry.Count -ne 1){throw 'Запись изменилась. Обнови список.'}
+   [void](Disable-WnStartupEntry -Entry $entry[0] -BackupDirectory $backupDirectory)
+   $done++
+  }catch{$errors.Add([string]$_.Exception.Message)}
+ }
+ Update-WnStartupGrid
+ $message=('Отключено записей: {0}.' -f $done)
+ if($errors.Count -gt 0){$message+=[Environment]::NewLine+'Ошибки: '+($errors -join '; ')}
+ [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
+})
+$startupRestore.Add_Click({
+ $selected=@($startupGrid.Rows|Where-Object{[bool]$_.Cells['Selected'].Value -and -not [string]::IsNullOrWhiteSpace([string]$_.Cells['BackupFile'].Value)})
+ if($selected.Count -eq 0){[System.Windows.Forms.MessageBox]::Show('Выбери резервную копию, которую нужно восстановить.','Автозагрузка','OK','Information')|Out-Null;return}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Восстановить выбранные записи автозагрузки? Существующие значения с таким же именем не будут перезаписаны.','Восстановление автозагрузки','YesNo','Question')
+ if($choice -ne [System.Windows.Forms.DialogResult]::Yes){return}
+ $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
+ $done=0;$errors=New-Object 'System.Collections.Generic.List[string]'
+ foreach($row in $selected){
+  try{[void](Restore-WnStartupEntry -BackupFile ([string]$row.Cells['BackupFile'].Value) -BackupDirectory $backupDirectory);$done++}
+  catch{$errors.Add([string]$_.Exception.Message)}
+ }
+ Update-WnStartupGrid
+ $message=('Восстановлено записей: {0}.' -f $done)
+ if($errors.Count -gt 0){$message+=[Environment]::NewLine+'Ошибки: '+($errors -join '; ')}
+ [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
+})
 
 $form.Add_Shown({
  try{
-  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnLogs
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnDriverCandidateGrid;Update-WnVolumePicker;Update-WnComponents;Update-WnStartupGrid;Update-WnLogs
   $maintInfo.Text=@'
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
