@@ -137,6 +137,82 @@ function Get-WnStorageDevices {
     return @($items)
 }
 
+function Get-WnMemoryInventory {
+    [CmdletBinding()]
+    param()
+
+    $modules = @()
+    foreach ($module in @(Get-WnSafeCim -ClassName 'Win32_PhysicalMemory')) {
+        $capacityGb = $null
+        if ($module.Capacity) {
+            $capacityGb = [math]::Round(([double]$module.Capacity / 1GB), 2)
+        }
+        $modules += [pscustomobject]@{
+            Manufacturer         = [string]$module.Manufacturer
+            PartNumber            = ([string]$module.PartNumber).Trim()
+            CapacityGB            = $capacityGb
+            SpeedMHz               = $module.Speed
+            ConfiguredClockSpeedMHz = $module.ConfiguredClockSpeed
+            DeviceLocator          = [string]$module.DeviceLocator
+            BankLabel              = [string]$module.BankLabel
+            MemoryType             = $module.SMBIOSMemoryType
+        }
+    }
+
+    $arrays = @(Get-WnSafeCim -ClassName 'Win32_PhysicalMemoryArray')
+    $arrayInfo = @()
+    foreach ($array in $arrays) {
+        $maximumGb = $null
+        # Win32_PhysicalMemoryArray.MaxCapacity is reported in kilobytes.
+        if ($array.MaxCapacity) {
+            $maximumGb = [math]::Round(([double]$array.MaxCapacity / 1MB), 1)
+        }
+        $arrayInfo += [pscustomobject]@{
+            MemoryDevices       = $array.MemoryDevices
+            ReportedMaxCapacityGB = $maximumGb
+            Location            = $array.Location
+            Use                 = $array.Use
+        }
+    }
+
+    [pscustomobject]@{
+        Modules = @($modules)
+        Arrays  = @($arrayInfo)
+    }
+}
+
+function Get-WnNetworkDevices {
+    [CmdletBinding()]
+    param()
+
+    $items = @()
+    $drivers = @(Get-WnSafeCim -ClassName 'Win32_PnPSignedDriver')
+    foreach ($driver in $drivers) {
+        $class = [string]$driver.DeviceClass
+        if ($class -notin @('NET', 'BLUETOOTH')) {
+            continue
+        }
+
+        $name = [string]$driver.DeviceName
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+
+        $items += [pscustomobject]@{
+            Name          = $name
+            Class         = $class
+            Manufacturer  = [string]$driver.Manufacturer
+            InstanceId    = [string]$driver.DeviceID
+            DriverVersion = [string]$driver.DriverVersion
+            DriverDate    = try { ([datetime]$driver.DriverDate).ToString('yyyy-MM-dd') } catch { $null }
+            InfName       = [string]$driver.InfName
+            IsSigned      = $driver.IsSigned
+        }
+    }
+
+    return @($items)
+}
+
 function Get-WnActivePowerPlan {
     [CmdletBinding()]
     param()
@@ -188,11 +264,11 @@ function Get-WnAudit {
             try { $installDate = ([datetime]$os.InstallDate).ToString('yyyy-MM-dd') } catch { $installDate = $null }
         }
         $osInfo = [pscustomobject]@{
-            Caption      = [string]$os.Caption
-            Version      = [string]$os.Version
-            BuildNumber  = [string]$os.BuildNumber
-            Architecture = [string]$os.OSArchitecture
-            InstallDate  = $installDate
+            Caption       = [string]$os.Caption
+            Version       = [string]$os.Version
+            BuildNumber   = [string]$os.BuildNumber
+            Architecture  = [string]$os.OSArchitecture
+            InstallDate   = $installDate
         }
     }
 
@@ -218,28 +294,30 @@ function Get-WnAudit {
     }
 
     [pscustomobject]@{
-        SchemaVersion  = '1.0'
-        ToolVersion    = '0.1.0'
-        CollectedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
-        CollectionMode = 'ReadOnly'
+        SchemaVersion   = '1.1'
+        ToolVersion     = '0.2.0'
+        CollectedAtUtc  = (Get-Date).ToUniversalTime().ToString('o')
+        CollectionMode  = 'ReadOnly'
         OperatingSystem = $osInfo
         System          = $systemInfo
         Processor       = $cpuInfo
         Graphics        = @(Get-WnDisplayDevices)
         Storage         = @(Get-WnStorageDevices)
+        Memory          = Get-WnMemoryInventory
+        NetworkDevices  = @(Get-WnNetworkDevices)
         ActivePowerPlan = Get-WnActivePowerPlan
         SecureBoot      = $secureBoot
         Privacy         = [pscustomobject]@{
-            SerialNumbersCollected       = $false
-            ProductKeysCollected         = $false
-            UsernamesCollected           = $false
-            NetworkAddressesCollected    = $false
-            PersonalFileNamesCollected   = $false
+            SerialNumbersCollected     = $false
+            ProductKeysCollected       = $false
+            UsernamesCollected         = $false
+            NetworkAddressesCollected  = $false
+            PersonalFileNamesCollected = $false
         }
         Notes = @(
             'This inventory reads system metadata only.',
             'It does not install, remove, or modify drivers or Windows settings.',
-            'A hardware profile is not accepted as proof; live device IDs must be reviewed.'
+            'Hardware profiles are planning hints and never authorize driver installation.'
         )
     }
 }
