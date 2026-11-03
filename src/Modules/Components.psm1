@@ -26,7 +26,7 @@ function Get-WnVCRuntimeStatus {
             RegistryPath = $item.RegistryPath
         })
     }
-    return @($items)
+    return $items.ToArray()
 }
 
 function Test-WnAdministratorForComponents {
