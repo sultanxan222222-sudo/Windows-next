@@ -2,6 +2,7 @@ BeforeAll {
     $script:ProjectRoot = Split-Path -Parent $PSScriptRoot
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Inventory.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Report.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\ComponentPlan.psm1') -Force
 }
 
 Describe 'Windows Next source validation' {
@@ -24,14 +25,16 @@ Describe 'Windows Next source validation' {
         }
     }
 
-    It 'exposes the read-only inventory entry point' {
+    It 'exposes the read-only inventory and component planner' {
         (Get-Command Get-WnAudit -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
+        (Get-Command Get-WnComponentPlan -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
     }
 
     It 'exports JSON and TXT reports from a supplied fixture' {
         $fixture = [pscustomobject]@{
-            SchemaVersion = '1.0'
+            SchemaVersion = '1.1'
             ToolVersion = 'test'
+            CollectionMode = 'ReadOnly'
             CollectedAtUtc = '2026-01-01T00:00:00Z'
             OperatingSystem = [pscustomobject]@{
                 Caption = 'Test Windows'
@@ -53,6 +56,8 @@ Describe 'Windows Next source validation' {
             }
             Graphics = @()
             Storage = @()
+            Memory = [pscustomobject]@{ Modules = @(); Arrays = @() }
+            NetworkDevices = @()
             ActivePowerPlan = 'Test plan'
             SecureBoot = 'Unknown'
         }
@@ -64,5 +69,40 @@ Describe 'Windows Next source validation' {
         Test-Path -LiteralPath $result.TextPath | Should -BeTrue
         (Get-Content -LiteralPath $result.JsonPath -Raw) | Should -Match '"ToolVersion"'
         (Get-Content -LiteralPath $result.TextPath -Raw) | Should -Match 'WINDOWS NEXT'
+    }
+
+    It 'never authorizes unapproved hardware packages for automatic installation' {
+        $manifestPath = Join-Path $TestDrive 'components.json'
+        @{
+            schemaVersion = 2
+            components = @(
+                @{
+                    id = 'test-gpu'
+                    displayName = 'Test GPU'
+                    inventoryClass = 'Graphics'
+                    expectedHardwareIdPrefix = 'PCI\VEN_1234&DEV_5678'
+                    approvalStatus = 'blocked'
+                    packages = @()
+                    blockReason = 'Not approved for this test.'
+                }
+            )
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+
+        $audit = [pscustomobject]@{
+            Graphics = @(
+                [pscustomobject]@{
+                    Name = 'Test GPU'
+                    InstanceId = 'PCI\VEN_1234&DEV_5678&SUBSYS_00000000\1'
+                    HardwareIds = @('PCI\VEN_1234&DEV_5678&SUBSYS_00000000')
+                    DriverVersion = '1.0.0.0'
+                }
+            )
+            NetworkDevices = @()
+        }
+
+        $plan = Get-WnComponentPlan -Audit $audit -ManifestPath $manifestPath
+        $plan.InstallationEnabled | Should -BeFalse
+        $plan.Components[0].Decision | Should -Be 'KEEP_CURRENT'
+        $plan.Components[0].AutomaticInstall | Should -BeFalse
     }
 }
