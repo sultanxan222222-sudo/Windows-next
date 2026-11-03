@@ -240,7 +240,11 @@ function Finish-WnTask([object]$Result){
    $message+=[Environment]::NewLine+'Резервная копия: '+[string]$Result.Result.BackupPath
    if($installation.RebootRequired){$message+=[Environment]::NewLine+'Требуется перезагрузка Windows. Она не будет выполняться автоматически.'}
    else{
-    $message+=[Environment]::NewLine+'Перезагрузка не требуется. Проверь устройство в Диспетчере устройств перед следующей установкой.'
+    $message+=[Environment]::NewLine+'Перезагрузка не требуется. Проверка установленных устройств:'
+    foreach($device in @($installation.VerifiedDevices)){
+     $message+=[Environment]::NewLine+('{0}: версия {1}, дата {2}, устройство без ошибки, цифровая подпись есть' -f $device.DeviceName,$device.DriverVersion,$device.DriverDate)
+    }
+    $message+=[Environment]::NewLine+'Проверь работу устройства перед следующей установкой.'
     try{Update-WnDrivers}catch{}
    }
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
