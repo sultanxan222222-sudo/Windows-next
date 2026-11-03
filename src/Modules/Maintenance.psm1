@@ -145,7 +145,7 @@ function Invoke-WnOptimizeVolume {
     Optimize-Volume -DriveLetter $DriveLetter -Verbose -ErrorAction Stop 4>&1 |
         Out-String | Add-Content -LiteralPath $LogPath -Encoding UTF8
     Write-WnTaskLog -Path $LogPath -Message 'Windows volume optimization completed.'
-    return [pscustomobject]@{ DriveLetter = $DriveLetter; FileSystem = $volume.FileSystem; MediaType = [string]$volume.DriveType }
+    return [pscustomobject]@{ DriveLetter = $DriveLetter; FileSystem = $volume.FileSystem; DriveType = [string]$volume.DriveType }
 }
 
 function Invoke-WnScanVolume {
