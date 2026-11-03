@@ -39,7 +39,7 @@ Windows 11 Pro 21H2 is out of servicing. A supported OS path is a separate engin
 
 ## Build and package
 
-The GitHub Actions workflow `/.github/workflows/build-installer.yml` runs PowerShell analysis and Pester tests, then compiles a single Inno Setup EXE and uploads its SHA-256 sidecar.
+The GitHub Actions workflows run PowerShell analysis and Pester tests, then compile a single Inno Setup EXE and upload its SHA-256 sidecar. See `docs/BUILD-VERIFICATION.md` for automated checks and the manual acceptance work that still requires the physical Acer.
 
 Current development version: **0.5.0**.
 
