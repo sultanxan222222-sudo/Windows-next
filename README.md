@@ -1,52 +1,63 @@
 # Windows Next
 
-**A single-package Windows maintenance and hardware-compatibility project.**
+**One installable Windows maintenance package, tailored first for the Acer Aspire V3-772.**
 
-Windows Next is being developed first for the user-reported Acer Aspire V3-772 running Windows 11 x64. The long-term goal is one installer that identifies the machine, selects only verified compatible components, installs them in a controlled order, validates the result, and provides a recovery path.
+The project is moving from a read-only inventory into a controlled, fail-closed maintenance application. Its target is one self-installing EXE that places the application on the computer, checks the hardware, selects only evidence-approved components, applies them in a controlled order, validates the result, and provides a recovery route.
 
-## Current milestone: read-only inventory
+## Current build: installable app + read-only compatibility planning
 
-The first implementation deliberately performs **no system changes**. It collects a privacy-conscious hardware and driver inventory so that later driver decisions are based on the machine's actual Plug-and-Play IDs and installed versions, not assumptions.
+The current release candidate builds a single Inno Setup EXE. It installs the Windows Next application files and shortcuts, then can launch the diagnostic tool. The tool collects:
 
-### Run the inventory
+- Windows edition, version, build, and architecture.
+- CPU and system model.
+- Graphics adapters, device IDs, and driver metadata.
+- Physical disks and reported health.
+- Memory modules, speed, and memory-array information.
+- Network and Bluetooth devices with driver metadata.
+- Active power plan and Secure Boot status.
 
-1. Download or clone this repository.
-2. Double-click `Run-WindowsNext.cmd`.
-3. The script writes JSON and readable TXT reports under:
-   `%LOCALAPPDATA%\WindowsNext\Reports`
-4. After a successful run, Windows Next copies the readable TXT report to the clipboard automatically. Return to the ChatGPT conversation, click the message box, press **Ctrl+V**, then Enter.
-5. If the inventory fails, the error details are copied to the clipboard when Windows allows it; paste them into the conversation the same way.
+It then compares live hardware IDs with the component manifest. The component planner is **read-only** and fails closed.
 
-It does not require administrator rights. It does not download drivers, change the registry, install or remove drivers, alter power settings, or touch BIOS/firmware.
+### Build the installer
 
-## Initial target profile (must be confirmed by live inventory)
+The GitHub Actions workflow `.github/workflows/build-installer.yml` runs the PowerShell tests, compiles `installer/WindowsNext.iss`, and publishes `WindowsNext-Setup-0.2.0.exe` as a downloadable workflow artifact.
 
-- Acer Aspire V3-772
+For local builds, use Inno Setup 6:
+
+```powershell
+& "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" .\installer\WindowsNext.iss
+```
+
+The output is placed in `dist\WindowsNext-Setup-0.2.0.exe`.
+
+## Current hardware target
+
+- Acer Aspire V3-772 / VA70 HW
 - Intel Core i5-4200M
 - Intel HD Graphics 4600
 - NVIDIA GeForce GT 750M
-- 8 GB RAM
-- Windows 11 x64
+- 8 GB Kingston DDR3L-1600
+- Apacer AS340 120 GB SSD and Seagate 500 GB HDD
+- Qualcomm Atheros AR5BWB222 Wi-Fi
+- Broadcom NetLink Gigabit Ethernet
+- Qualcomm Atheros Bluetooth module
+- Windows 11 Pro x64, build 22000.2600
 
-This profile is a planning hint only. **It is not used as proof of device identity and cannot authorize a driver installation.**
+The detailed identifiers and installed driver versions are recorded in `manifest/profiles/acer-aspire-v3-772.json`.
 
-## Safety model
+## Driver installation status
 
-- Fail closed: unknown or mismatched hardware means no installation.
-- No BIOS, UEFI, VBIOS, firmware, voltage, overclocking, or thermal-limit changes.
-- No disabling Windows security controls or driver-signature enforcement.
-- Drivers must match the exact device IDs and OS target, have a traceable source, and pass signature/hash checks.
-- Preserve the previous driver state and validate each stage before proceeding.
-- A failed check stops the sequence; no later package is installed.
+**No driver is currently approved for unattended installation.** The graphics and network packages are being checked against exact device IDs, Windows 11 build support, vendor security notices, signatures, hashes, and rollback requirements. This is intentional: a driver with a higher version number is not automatically safer or more compatible.
 
-## Repository layout
+The current installer installs Windows Next itself and runs read-only diagnostics. It does not yet install third-party drivers or apply system tweaks. Those operations remain disabled until validated packages and recovery tests are available.
 
-- `src/` — Windows Next application and read-only inventory modules.
-- `manifest/` — hardware planning profile and component approval state.
-- `docs/` — engineering, driver-selection, and release-gate policies.
-- `tests/` — PowerShell parsing and smoke tests.
-- `.github/workflows/` — automated validation.
+## Safety contract
 
-## Status
+- No BIOS, UEFI, VBIOS, EC, or device firmware changes.
+- No voltage, overclocking, thermal-limit, or fan-safety changes.
+- No disabling Defender, Windows Update, Secure Boot, or driver-signature enforcement.
+- No forced driver installation or opaque registry/debloat bundles.
+- Changes must be backed up, applied one at a time, verified, logged, and recoverable.
+- A failed validation stops the sequence.
 
-This is an engineering foundation, **not yet a driver installer**. No Intel or NVIDIA driver package is bundled or installed until the live inventory is reviewed and a specific package is verified for this exact machine and Windows build.
+See `docs/SAFETY-CONTRACT.md`, `docs/DRIVER-SELECTION.md`, and `docs/COMPATIBILITY-RESEARCH.md`.
