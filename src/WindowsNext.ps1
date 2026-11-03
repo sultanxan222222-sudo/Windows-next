@@ -54,12 +54,38 @@ try {
         ('Text report: {0}' -f $report.TextPath)
     ) | Add-Content -LiteralPath $logPath -Encoding UTF8
 
+    $clipboardReady = $false
+    try {
+        $shareText = [System.IO.File]::ReadAllText($report.TextPath)
+        if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
+            Set-Clipboard -Value $shareText -ErrorAction Stop
+            $clipboardReady = $true
+        }
+        else {
+            $clipExe = Join-Path $env:SystemRoot 'System32\clip.exe'
+            if (Test-Path -LiteralPath $clipExe) {
+                $shareText | & $clipExe
+                $clipboardReady = ($LASTEXITCODE -eq 0)
+            }
+        }
+    }
+    catch {
+        $clipboardReady = $false
+    }
+
     Write-Host 'Inventory completed.' -ForegroundColor Green
     Write-Host ('JSON report: {0}' -f $report.JsonPath)
     Write-Host ('Text report: {0}' -f $report.TextPath)
     Write-Host ('Startup log: {0}' -f $logPath)
     Write-Host ''
-    Write-Host 'Send the JSON or TXT report for exact driver and hardware matching.'
+    if ($clipboardReady) {
+        Write-Host 'REPORT COPIED TO CLIPBOARD.' -ForegroundColor Green
+        Write-Host 'Return to this ChatGPT conversation, click the message box, press Ctrl+V, then Enter.'
+    }
+    else {
+        Write-Host 'Automatic clipboard copy was unavailable on this Windows session.'
+        Write-Host ('Please open and copy this report manually: {0}' -f $report.TextPath)
+    }
     exit 0
 }
 catch {
@@ -90,6 +116,27 @@ catch {
     Write-Host $_.Exception.Message -ForegroundColor Yellow
     if (-not [string]::IsNullOrWhiteSpace($logPath)) {
         Write-Host ('Diagnostic log: {0}' -f $logPath)
+    }
+    $errorCopied = $false
+    try {
+        if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
+            Set-Clipboard -Value $details -ErrorAction Stop
+            $errorCopied = $true
+        }
+        else {
+            $clipExe = Join-Path $env:SystemRoot 'System32\clip.exe'
+            if (Test-Path -LiteralPath $clipExe) {
+                $details | & $clipExe
+                $errorCopied = ($LASTEXITCODE -eq 0)
+            }
+        }
+    }
+    catch {
+        $errorCopied = $false
+    }
+
+    if ($errorCopied) {
+        Write-Host 'Error details copied to clipboard. Paste them into this ChatGPT conversation with Ctrl+V.' -ForegroundColor Yellow
     }
     Write-Host 'No driver installation or Windows configuration change was attempted.'
     exit 1
