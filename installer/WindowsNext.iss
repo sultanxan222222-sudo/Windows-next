@@ -12,17 +12,14 @@ DefaultGroupName={#ProductName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist
 OutputBaseFilename=WindowsNext-Setup-{#ProductVersion}
-SetupIconFile=
 UninstallDisplayName={#ProductName}
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=dialog
 WizardStyle=modern
 Compression=lzma2
 SolidCompression=yes
 UsePreviousAppDir=yes
-CloseApplications=force
 RestartApplications=no
 SetupLogging=yes
 VersionInfoVersion=0.2.0.0
@@ -57,13 +54,3 @@ Name: "{group}\Удалить Windows Next"; Filename: "{uninstallexe}"
 [Run]
 Filename: "{app}\Run-WindowsNext.cmd"; Description: "Запустить Windows Next и проверить компьютер"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
-[Code]
-function InitializeSetup(): Boolean;
-var
-  Version: TWindowsVersion;
-begin
-  GetWindowsVersionEx(Version);
-  Result := IsWin64;
-  if not Result then
-    MsgBox('Windows Next предназначен для 64-разрядной Windows.', mbError, MB_OK);
-end;
