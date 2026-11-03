@@ -64,9 +64,10 @@ function Invoke-WnTempCleanup {
     [int]$deleted = 0
     [int]$skipped = 0
 
-    # The cleanup is deliberately restricted to the current user's LocalAppData\Temp.
+    # The cleanup is deliberately restricted to files directly inside the current user's LocalAppData\Temp.
+    # It does not recurse into subfolders, so junctions and symbolic links cannot redirect cleanup outside Temp.
     # Files newer than 14 days, reparse points, and inaccessible/in-use files are retained.
-    $files = @(Get-ChildItem -LiteralPath $tempRoot -File -Recurse -Force -ErrorAction SilentlyContinue)
+    $files = @(Get-ChildItem -LiteralPath $tempRoot -File -Force -ErrorAction SilentlyContinue)
     foreach ($file in $files) {
         try {
             if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
