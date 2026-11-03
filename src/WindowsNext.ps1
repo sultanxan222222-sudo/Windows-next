@@ -14,7 +14,7 @@ $script:ReportsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Reports'
 $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 [void][IO.Directory]::CreateDirectory($script:ReportsPath)
 [void][IO.Directory]::CreateDirectory($script:LogsPath)
-$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1','Performance.psm1')
+$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1','Performance.psm1','Startup.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
  if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
