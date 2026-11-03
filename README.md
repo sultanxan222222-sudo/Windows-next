@@ -4,7 +4,7 @@
 
 ## What the desktop app does
 
-The application is a Russian-language Windows Forms desktop program with six areas: system overview, maintenance, driver inventory/backup, software libraries, user startup management, and logs.
+The application is a Russian-language Windows Forms desktop program with seven areas: system overview, maintenance, driver inventory/backup, Windows Update driver search, software libraries, user startup management, and logs.
 
 - **Temporary-file cleanup:** removes only the current user's LocalAppData\Temp files older than 14 days. It does not clean Downloads, Documents, Windows folders, or recent files.
 - **Drive optimization:** invokes Windows' own Optimize-Volume operation on any selected fixed local volume, so the SSD and HDD can be handled separately. Windows decides whether to issue SSD optimization/TRIM or an HDD optimization.
@@ -14,6 +14,7 @@ The application is a Russian-language Windows Forms desktop program with six are
 - **Restore point:** creates a named Windows restore point when System Protection is available.
 - **Driver backup:** exports third-party Windows driver packages to Documents\WindowsNext\DriverBackup, writes a CSV/JSON index, and calculates SHA-256 for each exported file.
 - **Device view:** shows current display, network, and Bluetooth driver versions and hardware IDs.
+- **Driver updates:** searches only the Windows Update driver category. It offers an update only when the Windows Update package's Hardware ID exactly matches a live device ID and its driver date is newer than the installed driver date. The user selects one package at a time. Before installation, Windows Next exports current third-party drivers and requires a successful restore point. It never restarts Windows automatically.
 - **Reports and logs:** keeps readable records under %LOCALAPPDATA%\WindowsNext.
 
 System-level tasks ask for UAC elevation separately. The app stays responsive while the task runs and checks its result.
@@ -65,4 +66,4 @@ The build output is `dist\WindowsNext-Setup-<version>.exe`.
 
 ## Development state
 
-Current development includes the maintenance center, read-only hardware/performance assessment, reversible current-user startup controls, and a signature-checked Microsoft Visual C++ v14 installer. Device-driver installation remains disabled: no third-party driver package has passed exact hardware-ID and Windows-build validation for this laptop. The app has not yet passed install/use/uninstall acceptance testing on the physical Acer; CI success alone is not hardware acceptance.
+Current development includes the maintenance center, read-only hardware/performance assessment, reversible current-user startup controls, a signature-checked Microsoft Visual C++ v14 installer, and a tightly gated Windows Update driver path. No third-party driver package has passed exact hardware-ID and Windows-build validation for this laptop. Windows Update may return no candidates on this out-of-servicing Windows 11 21H2 build. The app has not yet passed install/use/uninstall acceptance testing on the physical Acer; CI success alone is not hardware acceptance.
