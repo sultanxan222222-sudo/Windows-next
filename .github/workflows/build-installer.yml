@@ -1,0 +1,57 @@
+name: Build Windows Next installer
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force
+
+      - name: Run PowerShell tests
+        shell: pwsh
+        run: |
+          Invoke-Pester -Path ./tests -CI -Output Detailed
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
+
+      - name: Build single EXE installer
+        shell: pwsh
+        run: |
+          $compiler = Join-Path $env:ProgramFiles '(x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $compiler)) {
+            $compiler = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
+          }
+          if (-not (Test-Path -LiteralPath $compiler)) { throw "Inno Setup compiler not found." }
+          & $compiler .\installer\WindowsNext.iss
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
+          if (-not (Test-Path .\dist\WindowsNext-Setup-0.2.0.exe)) {
+            throw "Expected installer EXE was not produced."
+          }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsNext-Setup-0.2.0
+          path: dist/WindowsNext-Setup-0.2.0.exe
+          if-no-files-found: error
+          retention-days: 30
