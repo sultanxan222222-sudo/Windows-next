@@ -188,7 +188,7 @@ $homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePan
 $homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
 $refresh=New-WnButton 'Обновить обзор' 180;$saveReport=New-WnButton 'Сохранить отчёт' 180;$openReports=New-WnButton 'Папка отчётов' 160
 $homeBar.Controls.AddRange(@($refresh,$saveReport,$openReports))
-$overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview)
+$overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview);$homePanel.Controls.SetChildIndex($homeBar,0)
 
 $maintPanel=New-Object System.Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object System.Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
 $maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=160;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
@@ -207,7 +207,7 @@ $restore=New-WnButton 'Создать точку восстановления' 2
 $maintBar.Controls.AddRange(@($volumeLabel,$volumePicker,$refreshVolumes,$clean,$optimize,$scan,$check,$repair,$restore))
 $maintInfo=New-WnTextBox;$maintInfo.Dock='Fill';$maintPanel.Controls.Add($maintInfo)
 $status=New-Object System.Windows.Forms.Label;$status.Dock='Bottom';$status.Height=30;$status.ForeColor=$script:Muted
-$status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status)
+$status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status);$maintPanel.Controls.SetChildIndex($maintBar,0);$maintPanel.Controls.SetChildIndex($status,1)
 
 $driverPanel=New-Object System.Windows.Forms.Panel;$driverPanel.Dock='Fill';$driverPanel.Padding=New-Object System.Windows.Forms.Padding(12);$drivers.Controls.Add($driverPanel)
 $driverBar=New-Object System.Windows.Forms.FlowLayoutPanel;$driverBar.Dock='Top';$driverBar.Height=54;$driverPanel.Controls.Add($driverBar)
@@ -217,12 +217,12 @@ $driverGrid=New-Object System.Windows.Forms.DataGridView;$driverGrid.Dock='Fill'
 $driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$driverGrid.AutoSizeColumnsMode='Fill'
 $driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
 $driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
-$driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote)
+$driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote);$driverPanel.Controls.SetChildIndex($driverBar,0);$driverPanel.Controls.SetChildIndex($driverNote,1)
 
 $logPanel=New-Object System.Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object System.Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
 $logBar=New-Object System.Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
 $logRefresh=New-WnButton 'Обновить журнал' 180;$logFolder=New-WnButton 'Папка журналов' 180;$logBar.Controls.AddRange(@($logRefresh,$logFolder))
-$logText=New-WnTextBox;$logText.Dock='Fill';$logPanel.Controls.Add($logText)
+$logText=New-WnTextBox;$logText.Dock='Fill';$logPanel.Controls.Add($logText);$logPanel.Controls.SetChildIndex($logBar,0)
 
 $script:TaskTimer=New-Object System.Windows.Forms.Timer;$script:TaskTimer.Interval=1000
 $script:TaskTimer.Add_Tick({
