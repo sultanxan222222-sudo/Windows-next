@@ -7,6 +7,7 @@ BeforeAll {
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Performance.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Startup.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Force
 }
 
 Describe 'Windows Next source validation' {
@@ -196,6 +197,31 @@ Describe 'Windows Next source validation' {
         $module | Should -Match 'https://aka\.ms/vc14/vc_redist\.x86\.exe'
         $module | Should -Match 'Get-AuthenticodeSignature'
         $module | Should -Match 'Microsoft Corporation'
+    }
+
+
+    It 'accepts only an exact hardware ID with a newer Windows Update driver date' {
+        $deviceId = 'PCI\VEN_8086&DEV_0416&SUBSYS_07811025&REV_06'
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId,'PCI\VEN_8086&DEV_0416') -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2015-08-04') -UpdateDriverDate ([datetime]'2020-01-01') | Should -BeTrue
+    }
+
+    It 'rejects compatible or partial hardware IDs instead of treating them as exact matches' {
+        $deviceId = 'PCI\VEN_8086&DEV_0416&SUBSYS_07811025&REV_06'
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId 'PCI\VEN_8086&DEV_0416' -CurrentDriverDate ([datetime]'2015-08-04') -UpdateDriverDate ([datetime]'2020-01-01') | Should -BeFalse
+    }
+
+    It 'rejects Windows Update drivers with an equal or older driver date' {
+        $deviceId = 'PCI\VEN_10DE&DEV_0FE4&SUBSYS_07811025'
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2016-12-29') -UpdateDriverDate ([datetime]'2016-12-29') | Should -BeFalse
+        Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2016-12-29') -UpdateDriverDate ([datetime]'2014-01-01') | Should -BeFalse
+    }
+
+    It 'restricts automated driver discovery to Windows Update driver entries' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Raw
+        $module | Should -Match "IsInstalled=0 and Type='Driver' and IsHidden=0"
+        $module | Should -Match 'IncludePotentiallySupersededUpdates = \\$false'
+        $module | Should -Match 'Install-WnWindowsUpdateDriver'
+        $module | Should -Match 'At least 2 GB of free space'
     }
 
 }
