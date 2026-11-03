@@ -3,6 +3,7 @@ BeforeAll {
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Inventory.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Report.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\ComponentPlan.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Force
 }
 
 Describe 'Windows Next source validation' {
@@ -23,6 +24,18 @@ Describe 'Windows Next source validation' {
             )
             $parseErrors | Should -BeNullOrEmpty -Because $file.FullName
         }
+    }
+
+    It 'exposes the maintenance task engine' {
+        (Get-Command Invoke-WnMaintenanceAction -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
+        (Get-Command Test-WnAdministrator -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
+    }
+
+    It 'uses the maintenance center as the product entry point' {
+        $app = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\WindowsNext.ps1') -Raw
+        $app | Should -Match 'Windows Next — центр обслуживания'
+        $app | Should -Match 'RepairWindows'
+        $app | Should -Match 'ExportDrivers'
     }
 
     It 'exposes the read-only inventory and component planner' {
