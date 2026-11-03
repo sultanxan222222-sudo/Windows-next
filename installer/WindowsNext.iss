@@ -29,6 +29,7 @@ VersionInfoProductName={#ProductName}
 VersionInfoProductVersion={#ProductVersion}
 
 [Languages]
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
