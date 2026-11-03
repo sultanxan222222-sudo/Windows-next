@@ -31,7 +31,7 @@ if(-not[string]::IsNullOrWhiteSpace($Task)){
 }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-[System.System.Windows.Forms.Application]::EnableVisualStyles()
+[System.Windows.Forms.Application]::EnableVisualStyles()
 $script:Back=[System.Drawing.Color]::FromArgb(24,29,38)
 $script:Panel=[System.Drawing.Color]::FromArgb(34,41,53)
 $script:Text=[System.Drawing.Color]::FromArgb(232,236,242)
