@@ -234,7 +234,7 @@ function Finish-WnTask([object]$Result){
    if($installation.RebootRequired){$message+=[Environment]::NewLine+'Требуется перезагрузка Windows. Она не будет выполняться автоматически.'}
    else{
     $message+=[Environment]::NewLine+'Перезагрузка не требуется. Проверь устройство в Диспетчере устройств перед следующей установкой.'
-    Update-WnDrivers
+    try{Update-WnDrivers}catch{}
    }
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   }
@@ -270,7 +270,7 @@ function Start-WnTask{
   $script:ActiveTask=[pscustomobject]@{Process=$proc;ResultFile=$resultFile;Caption=$Caption}
   $status.Text=('Выполняется: {0}' -f $Caption);$script:TaskTimer.Start()
  }catch [System.ComponentModel.Win32Exception]{
-  if($_.Exception.NativeErrorCode -eq 1223){$status.Text='Запрос UAC отменён. Изменений не выполнено.'}
+  if($_.Exception.NativeErrorCode -eq 1223){if($SelectionFile){Remove-Item -LiteralPath $SelectionFile -Force -ErrorAction SilentlyContinue};$status.Text='Запрос UAC отменён. Изменений не выполнено.'}
   else{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
  }catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
 }
