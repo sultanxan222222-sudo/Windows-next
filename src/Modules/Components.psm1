@@ -116,4 +116,71 @@ function Invoke-WnInstallVCRuntime {
     }
 }
 
-Export-ModuleMember -Function Get-WnVCRuntimeStatus, Invoke-WnInstallVCRuntime
+
+function Get-WnNetFx3Status {
+    [CmdletBinding()]
+    param()
+
+    if (-not (Get-Command Get-WindowsOptionalFeature -ErrorAction SilentlyContinue)) {
+        throw 'Windows Optional Feature management is not available on this Windows installation.'
+    }
+    $feature = Get-WindowsOptionalFeature -Online -FeatureName NetFx3 -ErrorAction Stop
+    [pscustomobject]@{
+        FeatureName = 'NetFx3'
+        State = [string]$feature.State
+        Enabled = ([string]$feature.State -eq 'Enabled')
+        RestartRequired = ([string]$feature.State -in @('EnablePending','DisablePending'))
+    }
+}
+
+function Invoke-WnEnableNetFx3 {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$LogPath)
+
+    if (-not (Test-WnAdministratorForComponents)) {
+        throw 'Включение .NET Framework 3.5 требует подтверждения UAC администратора.'
+    }
+
+    $before = Get-WnNetFx3Status
+    if ($before.Enabled) {
+        Write-WnComponentLog -LogPath $LogPath -Message '.NET Framework 3.5 is already enabled. No changes made.'
+        return [pscustomobject]@{ State='Enabled'; Changed=$false; RebootRequired=$false }
+    }
+    if ($before.RestartRequired) {
+        throw 'Для NetFx3 уже ожидает завершения другая операция Windows. Сначала перезагрузите компьютер и проверьте состояние.'
+    }
+
+    $dism = Join-Path $env:SystemRoot 'System32\dism.exe'
+    $stdout = Join-Path $env:TEMP ('WindowsNext-NetFx3-' + [guid]::NewGuid().ToString('N') + '.stdout')
+    $stderr = Join-Path $env:TEMP ('WindowsNext-NetFx3-' + [guid]::NewGuid().ToString('N') + '.stderr')
+    try {
+        Write-WnComponentLog -LogPath $LogPath -Message 'Enabling Windows optional feature NetFx3 through DISM and the Windows-configured feature source.'
+        $process = Start-Process -FilePath $dism -ArgumentList @('/Online','/Enable-Feature','/FeatureName:NetFx3','/All','/NoRestart') -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        if (Test-Path -LiteralPath $stdout) {
+            Get-Content -LiteralPath $stdout -ErrorAction SilentlyContinue | Add-Content -LiteralPath $LogPath -Encoding UTF8
+        }
+        if (Test-Path -LiteralPath $stderr) {
+            Get-Content -LiteralPath $stderr -ErrorAction SilentlyContinue | Add-Content -LiteralPath $LogPath -Encoding UTF8
+        }
+        if ($process.ExitCode -notin @(0,3010)) {
+            throw ('DISM .NET Framework 3.5 operation failed with exit code {0}. See the task log. No restart was performed.' -f $process.ExitCode)
+        }
+
+        $after = Get-WnNetFx3Status
+        $reboot = ($process.ExitCode -eq 3010 -or $after.RestartRequired)
+        if (-not $after.Enabled -and -not $after.RestartRequired) {
+            throw ('DISM returned success but Windows still reports NetFx3 state {0}. Verify Windows Features before continuing.' -f $after.State)
+        }
+        Write-WnComponentLog -LogPath $LogPath -Message ('NetFx3 state after operation: {0}; reboot required: {1}' -f $after.State,$reboot)
+        [pscustomobject]@{
+            State = $after.State
+            Changed = $true
+            RebootRequired = [bool]$reboot
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Export-ModuleMember -Function Get-WnVCRuntimeStatus, Invoke-WnInstallVCRuntime, Get-WnNetFx3Status, Invoke-WnEnableNetFx3
