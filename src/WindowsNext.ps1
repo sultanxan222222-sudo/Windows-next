@@ -17,12 +17,12 @@ $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 $moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
- if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
+ if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
  Import-Module $path -Force -ErrorAction Stop
 }
-if(-not[string]::IsNullOrWhiteSpace($Task)){
+if (-not [string]::IsNullOrWhiteSpace($Task)){
  $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter
- if(-not[string]::IsNullOrWhiteSpace($ResultFile)){
+ if (-not [string]::IsNullOrWhiteSpace($ResultFile)){
   $parent=Split-Path -Parent $ResultFile
   [void][IO.Directory]::CreateDirectory($parent)
   $result|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ResultFile -Encoding UTF8
@@ -191,7 +191,7 @@ $homeBar.Controls.AddRange(@($refresh,$saveReport,$openReports))
 $overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview)
 
 $maintPanel=New-Object System.Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object System.Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
-$maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=112;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
+$maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=160;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
 $volumeLabel=New-Object System.Windows.Forms.Label
 $volumeLabel.Text='Выбери диск:';$volumeLabel.AutoSize=$true;$volumeLabel.Margin=New-Object System.Windows.Forms.Padding(8,14,2,2);$volumeLabel.ForeColor=$script:Text
 $volumePicker=New-Object System.Windows.Forms.ComboBox
@@ -253,13 +253,13 @@ $clean.Add_Click({
 $refreshVolumes.Add_Click({Update-WnVolumePicker})
 $optimize.Add_Click({
  $letter=[string]$volumePicker.SelectedValue
- if([string]::IsNullOrWhiteSpace($letter)){[Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
+ if([string]::IsNullOrWhiteSpace($letter)){[System.Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
  $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить штатную оптимизацию Windows для {0}:? Windows сама выберет операцию для SSD или HDD." -f $letter),'Оптимизация','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeVolume -Caption ('Оптимизация диска '+$letter+':') -Letter $letter -Admin}
 })
 $scan.Add_Click({
  $letter=[string]$volumePicker.SelectedValue
- if([string]::IsNullOrWhiteSpace($letter)){[Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
+ if([string]::IsNullOrWhiteSpace($letter)){[System.Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
  $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить онлайн-проверку NTFS тома {0}:?" -f $letter),'Проверка диска','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanVolume -Caption ('Проверка диска '+$letter+':') -Letter $letter -Admin}
 })
@@ -295,8 +295,8 @@ $form.Add_Shown({
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
 - Очистка пользовательских временных файлов старше 14 дней.
-- Штатная оптимизация системного SSD/HDD средствами Windows.
-- Онлайн-проверка NTFS-накопителя.
+- Штатная оптимизация любого выбранного внутреннего SSD/HDD средствами Windows.
+- Онлайн-проверка выбранного NTFS-накопителя.
 - Проверка целостности Windows через DISM и SFC.
 - Восстановление Windows с обязательной точкой восстановления.
 - Резервное копирование сторонних драйверов с индексом и SHA-256.
