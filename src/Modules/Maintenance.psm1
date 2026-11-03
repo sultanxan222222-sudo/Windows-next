@@ -266,15 +266,23 @@ function Invoke-WnMaintenanceAction {
                 $systemDisk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter ("DeviceID='{0}'" -f $systemDrive) -ErrorAction Stop
                 if ($null -eq $systemDisk -or [long]$systemDisk.FreeSpace -lt 2GB) { throw 'At least 2 GB of free space is required on the Windows drive. No driver was changed.' }
 
-                $backupFolder = Join-Path ([Environment]::GetFolderPath('MyDocuments')) ('WindowsNext\DriverBackup\Before-WU-{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
-                $backup = Invoke-WnDriverBackup -Destination $backupFolder -LogPath $logPath
-                $restore = Invoke-WnCreateRestorePoint -LogPath $logPath
-                $installed = Install-WnWindowsUpdateDriver -UpdateId $parsedId -LogPath $logPath
-                [pscustomobject]@{
-                    BackupPath = $backup.Destination
-                    DriverPackageCount = $backup.PackageCount
-                    RestorePointCreated = [bool]$restore.RestorePointCreated
-                    Installation = $installed
+                try {
+                    $stillAvailable = @(Get-WnWindowsUpdateDriverCandidates | Where-Object { [guid]$_.UpdateId -eq $parsedId })
+                    if ($stillAvailable.Count -ne 1) { throw 'The selected driver is no longer applicable. No driver was changed.' }
+
+                    $backupFolder = Join-Path ([Environment]::GetFolderPath('MyDocuments')) ('WindowsNext\DriverBackup\Before-WU-{0}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
+                    $backup = Invoke-WnDriverBackup -Destination $backupFolder -LogPath $logPath
+                    $restore = Invoke-WnCreateRestorePoint -LogPath $logPath
+                    $installed = Install-WnWindowsUpdateDriver -UpdateId $parsedId -LogPath $logPath
+                    [pscustomobject]@{
+                        BackupPath = $backup.Destination
+                        DriverPackageCount = $backup.PackageCount
+                        RestorePointCreated = [bool]$restore.RestorePointCreated
+                        Installation = $installed
+                    }
+                }
+                finally {
+                    Remove-Item -LiteralPath $selectionPath -Force -ErrorAction SilentlyContinue
                 }
             }
         }
