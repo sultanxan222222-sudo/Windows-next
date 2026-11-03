@@ -21,14 +21,17 @@
 - [x] Create a named restore point on request.
 - [x] Export third-party drivers with CSV/JSON index and per-file SHA-256 hashes.
 - [x] Display existing GPU/network/Bluetooth drivers and IDs.
+- [x] Assess RAM layout, system-volume free space, Run startup count, and Windows build without modifying settings.
+- [x] Add reversible backup/restore for selected current-user Run startup entries; keep machine Run keys view-only.
+- [x] Add official Microsoft Visual C++ v14 x86/x64 setup with publisher signature check and post-install version verification.
 
 ## M3 — package and release
 - [x] Build a single self-installing EXE with Inno Setup.
 - [x] Install application files and Start Menu/Desktop shortcuts.
 - [x] Include the complete application and its modules in the same installer.
 - [x] Run PowerShell analysis and Pester tests in CI.
-- [ ] Validate the updated 0.3.0 app build and artifact.
-- [ ] Test install, first launch, each maintenance action, and uninstall on the target Acer.
+- [ ] Validate the current build script, installer, checksum, and artifact.
+- [ ] Test install, first launch, all tabs, each maintenance action, startup backup/restore, runtime installation, and uninstall on the target Acer.
 - [ ] Provide a signed publisher certificate before any public consumer release.
 
 ## M4 — component deployment
