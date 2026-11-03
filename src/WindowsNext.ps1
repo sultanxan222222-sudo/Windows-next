@@ -1,147 +1,273 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeSystemDrive','ScanSystemDrive','CheckWindows','RepairWindows','CreateRestorePoint')]
+ [string]$Task='',
+ [string]$Destination='',
+ [string]$DriveLetter='',
+ [string]$ResultFile=''
 )
-
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-
-$logDirectory = Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
-$logPath = $null
-
-try {
-    if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        throw 'Windows did not provide LOCALAPPDATA. Cannot create a diagnostic log.'
-    }
-
-    [void][System.IO.Directory]::CreateDirectory($logDirectory)
-    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $logPath = Join-Path $logDirectory "WindowsNext-Startup-$stamp.log"
-
-    @(
-        'WINDOWS NEXT STARTUP LOG'
-        ('Time (local): {0}' -f (Get-Date).ToString('o'))
-        ('PowerShell: {0}' -f $PSVersionTable.PSVersion)
-        ('Script: {0}' -f $PSCommandPath)
-        ''
-    ) | Set-Content -LiteralPath $logPath -Encoding UTF8
-
-    Write-Host ''
-    Write-Host 'Windows Next — hardware inventory and component compatibility' -ForegroundColor Cyan
-    Write-Host 'Mode: READ ONLY. No drivers or Windows settings will be changed.'
-    Write-Host ''
-
-    $moduleDirectory = Join-Path $PSScriptRoot 'Modules'
-    $inventoryModule = Join-Path $moduleDirectory 'Inventory.psm1'
-    $reportModule = Join-Path $moduleDirectory 'Report.psm1'
-    $componentPlanModule = Join-Path $moduleDirectory 'ComponentPlan.psm1'
-    $manifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'manifest\components.json'
-
-    foreach ($requiredFile in @($inventoryModule, $reportModule, $componentPlanModule, $manifestPath)) {
-        if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
-            throw ('Required project file is missing: {0}' -f $requiredFile)
-        }
-    }
-
-    Import-Module $inventoryModule -Force -ErrorAction Stop
-    Import-Module $reportModule -Force -ErrorAction Stop
-    Import-Module $componentPlanModule -Force -ErrorAction Stop
-
-    $audit = Get-WnAudit
-    $componentPlan = Get-WnComponentPlan -Audit $audit -ManifestPath $manifestPath
-    $report = Export-WnAuditReport -Audit $audit -ComponentPlan $componentPlan -OutputDirectory $OutputDirectory
-
-    @(
-        ('Status: SUCCESS')
-        ('JSON report: {0}' -f $report.JsonPath)
-        ('Text report: {0}' -f $report.TextPath)
-    ) | Add-Content -LiteralPath $logPath -Encoding UTF8
-
-    $clipboardReady = $false
-    try {
-        $shareText = [System.IO.File]::ReadAllText($report.TextPath)
-        if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
-            Set-Clipboard -Value $shareText -ErrorAction Stop
-            $clipboardReady = $true
-        }
-        else {
-            $clipExe = Join-Path $env:SystemRoot 'System32\clip.exe'
-            if (Test-Path -LiteralPath $clipExe) {
-                $shareText | & $clipExe
-                $clipboardReady = ($LASTEXITCODE -eq 0)
-            }
-        }
-    }
-    catch {
-        $clipboardReady = $false
-    }
-
-    Write-Host 'Inventory completed.' -ForegroundColor Green
-    Write-Host ('JSON report: {0}' -f $report.JsonPath)
-    Write-Host ('Text report: {0}' -f $report.TextPath)
-    Write-Host ('Startup log: {0}' -f $logPath)
-    Write-Host ''
-    if ($clipboardReady) {
-        Write-Host 'REPORT COPIED TO CLIPBOARD.' -ForegroundColor Green
-        Write-Host 'Return to this ChatGPT conversation, click the message box, press Ctrl+V, then Enter.'
-    }
-    else {
-        Write-Host 'Automatic clipboard copy was unavailable on this Windows session.'
-        Write-Host ('Please open and copy this report manually: {0}' -f $report.TextPath)
-    }
-    exit 0
+$ErrorActionPreference='Stop'
+$script:AppRoot=Split-Path -Parent $PSScriptRoot
+$script:ReportsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Reports'
+$script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
+[void][IO.Directory]::CreateDirectory($script:ReportsPath)
+[void][IO.Directory]::CreateDirectory($script:LogsPath)
+$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1')
+foreach($name in $moduleNames){
+ $path=Join-Path $PSScriptRoot ('Modules\'+$name)
+ if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
+ Import-Module $path -Force -ErrorAction Stop
 }
-catch {
-    $errorText = ($_ | Format-List * -Force | Out-String)
-    $details = @(
-        'STATUS: FAILED'
-        ('Time (local): {0}' -f (Get-Date).ToString('o'))
-        ('PowerShell: {0}' -f $PSVersionTable.PSVersion)
-        ('Script: {0}' -f $PSCommandPath)
-        ''
-        'ERROR DETAILS'
-        $errorText
-        'SCRIPT STACK'
-        [string]$_.ScriptStackTrace
-    ) -join [Environment]::NewLine
-
-    if (-not [string]::IsNullOrWhiteSpace($logPath)) {
-        try {
-            Add-Content -LiteralPath $logPath -Value $details -Encoding UTF8
-        }
-        catch {
-            # Keep the original error visible even if the log cannot be written.
-        }
-    }
-
-    Write-Host ''
-    Write-Host 'Windows Next could not complete the inventory.' -ForegroundColor Red
-    Write-Host $_.Exception.Message -ForegroundColor Yellow
-    if (-not [string]::IsNullOrWhiteSpace($logPath)) {
-        Write-Host ('Diagnostic log: {0}' -f $logPath)
-    }
-    $errorCopied = $false
-    try {
-        if (Get-Command -Name Set-Clipboard -ErrorAction SilentlyContinue) {
-            Set-Clipboard -Value $details -ErrorAction Stop
-            $errorCopied = $true
-        }
-        else {
-            $clipExe = Join-Path $env:SystemRoot 'System32\clip.exe'
-            if (Test-Path -LiteralPath $clipExe) {
-                $details | & $clipExe
-                $errorCopied = ($LASTEXITCODE -eq 0)
-            }
-        }
-    }
-    catch {
-        $errorCopied = $false
-    }
-
-    if ($errorCopied) {
-        Write-Host 'Error details copied to clipboard. Paste them into this ChatGPT conversation with Ctrl+V.' -ForegroundColor Yellow
-    }
-    Write-Host 'No driver installation or Windows configuration change was attempted.'
-    exit 1
+if(-not[string]::IsNullOrWhiteSpace($Task)){
+ $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter
+ if(-not[string]::IsNullOrWhiteSpace($ResultFile)){
+  $parent=Split-Path -Parent $ResultFile
+  [void][IO.Directory]::CreateDirectory($parent)
+  $result|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ResultFile -Encoding UTF8
+ }
+ if($result.Success){exit 0}else{exit 1}
 }
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+$script:Back=[Drawing.Color]::FromArgb(24,29,38)
+$script:Panel=[Drawing.Color]::FromArgb(34,41,53)
+$script:Text=[Drawing.Color]::FromArgb(232,236,242)
+$script:Muted=[Drawing.Color]::FromArgb(161,171,186)
+$script:Accent=[Drawing.Color]::FromArgb(236,178,52)
+$script:ActiveTask=$null
+
+function New-WnButton([string]$Caption,[int]$Width=210){
+ $b=New-Object Windows.Forms.Button
+ $b.Text=$Caption;$b.Width=$Width;$b.Height=42
+ $b.Margin=New-Object Windows.Forms.Padding(6)
+ $b.FlatStyle='Flat';$b.FlatAppearance.BorderColor=$script:Accent
+ $b.BackColor=$script:Panel;$b.ForeColor=$script:Text
+ $b.Font=New-Object Drawing.Font('Segoe UI',9)
+ $b.Cursor=[Windows.Forms.Cursors]::Hand
+ return $b
+}
+function New-WnTextBox{
+ $t=New-Object Windows.Forms.TextBox
+ $t.Multiline=$true;$t.ReadOnly=$true;$t.ScrollBars='Vertical'
+ $t.Dock='Fill';$t.BackColor=[Drawing.Color]::FromArgb(17,21,28)
+ $t.ForeColor=$script:Text;$t.BorderStyle='FixedSingle'
+ $t.Font=New-Object Drawing.Font('Consolas',9)
+ return $t
+}
+function Get-WnOverview{
+ $audit=Get-WnAudit
+ $plan=Get-WnComponentPlan -Audit $audit -ManifestPath (Join-Path $script:AppRoot 'manifest\components.json')
+ $lines=New-Object 'System.Collections.Generic.List[string]'
+ $lines.Add('WINDOWS NEXT — ЦЕНТР УПРАВЛЕНИЯ')
+ $lines.Add(('Проверено: {0}' -f (Get-Date -Format 'dd.MM.yyyy HH:mm:ss')))
+ $lines.Add('')
+ if($audit.OperatingSystem){$lines.Add(('Windows: {0} | сборка {1} | выпуск {2}' -f $audit.OperatingSystem.Caption,$audit.OperatingSystem.BuildNumber,$audit.OperatingSystem.DisplayVersion))}
+ if($audit.System){$lines.Add(('Компьютер: {0} {1} | ОЗУ {2} ГБ' -f $audit.System.Manufacturer,$audit.System.Model,$audit.System.MemoryGB))}
+ if($audit.Processor){$lines.Add(('Процессор: {0}' -f $audit.Processor.Name))}
+ $lines.Add('');$lines.Add('ВИДЕОАДАПТЕРЫ')
+ foreach($x in @($audit.Graphics)){$lines.Add(('{0} | {1} | {2}' -f $x.Name,$x.DriverVersion,$x.DriverDate))}
+ $lines.Add('');$lines.Add('НАКОПИТЕЛИ')
+ foreach($x in @($audit.Storage)){$lines.Add(('{0} | {1} ГБ | {2} | {3}' -f $x.Model,$x.SizeGB,$x.MediaType,$x.HealthStatus))}
+ $lines.Add('');$lines.Add('ОПЕРАТИВНАЯ ПАМЯТЬ')
+ foreach($x in @($audit.Memory.Modules)){$lines.Add(('{0} | {1} ГБ | {2} МГц | {3}' -f $x.Manufacturer,$x.CapacityGB,$x.SpeedMHz,$x.PartNumber))}
+ $lines.Add('');$lines.Add('СЕТЬ / BLUETOOTH')
+ foreach($x in @($audit.NetworkDevices)){$lines.Add(('{0} | {1} | {2}' -f $x.Name,$x.Class,$x.DriverVersion))}
+ $lines.Add('');$lines.Add('СОВМЕСТИМОСТЬ КОМПОНЕНТОВ')
+ foreach($w in @($plan.Warnings)){$lines.Add(('ВНИМАНИЕ: {0}' -f $w))}
+ foreach($x in @($plan.Components)){$lines.Add(('{0}: {1}' -f $x.DisplayName,$x.Decision))}
+ return ($lines -join [Environment]::NewLine)
+}
+function Update-WnDrivers{
+ $audit=Get-WnAudit;$rows=@()
+ foreach($x in @($audit.Graphics)){$rows+=[pscustomobject]@{Устройство=$x.Name;Класс='Графика';Версия=$x.DriverVersion;Дата=$x.DriverDate;ID=$x.InstanceId}}
+ foreach($x in @($audit.NetworkDevices)){$rows+=[pscustomobject]@{Устройство=$x.Name;Класс=$x.Class;Версия=$x.DriverVersion;Дата=$x.DriverDate;ID=$x.InstanceId}}
+ $driverGrid.DataSource=$rows
+}
+function Update-WnLogs{
+ $files=@(Get-ChildItem -LiteralPath $script:LogsPath -Filter 'WindowsNext-*.log' -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 12)
+ $out=New-Object 'System.Collections.Generic.List[string]'
+ foreach($f in $files){$out.Add(('===== {0} =====' -f $f.Name));foreach($line in @(Get-Content -LiteralPath $f.FullName -ErrorAction SilentlyContinue)){$out.Add([string]$line)};$out.Add('')}
+ $logText.Text=$out -join [Environment]::NewLine
+}
+function Finish-WnTask([object]$Result){
+ $script:TaskTimer.Stop()
+ if($null -eq $Result){$status.Text='Задача завершилась без отчёта. Откройте журнал.';$script:ActiveTask=$null;return}
+ if($Result.Success){
+  $status.Text=('Готово: {0}' -f $Result.Action)
+  $message='Операция выполнена. Журнал: '+[string]$Result.LogPath
+  if($Result.Action -eq 'CleanUserTemp' -and $Result.Result){
+   $message=('Удалено файлов: {0}; освобождено: {1} МБ; пропущено: {2}' -f $Result.Result.FilesDeleted,[math]::Round($Result.Result.BytesFreed/1MB,1),$Result.Result.Skipped)
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  if($Result.Action -eq 'ExportDrivers' -and $Result.Result){
+   $message=('Экспортировано пакетов: {0}' -f $Result.Result.PackageCount)
+   $message+=[Environment]::NewLine+'Папка: '+[string]$Result.Result.Destination
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  [Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
+ }else{
+  $status.Text=('Ошибка: {0}' -f $Result.Action)
+  $message='Операция остановлена: '+[string]$Result.Error
+  $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  [Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Error')|Out-Null
+ }
+ $script:ActiveTask=$null;Update-WnLogs
+}
+function Start-WnTask{
+ param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[switch]$Admin)
+ if($null -ne $script:ActiveTask){[Windows.Forms.MessageBox]::Show('Уже выполняется другая задача.','Windows Next','OK','Information')|Out-Null;return}
+ $resultDir=Join-Path $env:LOCALAPPDATA 'WindowsNext\Results'
+ [void][IO.Directory]::CreateDirectory($resultDir)
+ $resultFile=Join-Path $resultDir (([guid]::NewGuid().ToString('N'))+'.json')
+ $powershell=Join-Path $PSHOME 'powershell.exe'
+ $args='-NoLogo -NoProfile -WindowStyle Hidden -File "{0}" -Task {1} -ResultFile "{2}"' -f $PSCommandPath,$Action,$resultFile
+ if($Destination){$args+=' -Destination "{0}"' -f $Destination.Replace('"','')}
+ if($Letter){$args+=' -DriveLetter {0}' -f $Letter}
+ try{
+  $start=@{FilePath=$powershell;ArgumentList=$args;PassThru=$true;WindowStyle='Hidden'}
+  if($Admin){$start.Verb='RunAs'}
+  $proc=Start-Process @start
+  $script:ActiveTask=[pscustomobject]@{Process=$proc;ResultFile=$resultFile;Caption=$Caption}
+  $status.Text=('Выполняется: {0}' -f $Caption);$script:TaskTimer.Start()
+ }catch [System.ComponentModel.Win32Exception]{
+  if($_.Exception.NativeErrorCode -eq 1223){$status.Text='Запрос UAC отменён. Изменений не выполнено.'}
+  else{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
+ }catch{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
+}
+
+$form=New-Object Windows.Forms.Form
+$form.Text='Windows Next — центр обслуживания'
+$form.Size=New-Object Drawing.Size(1120,760);$form.MinimumSize=New-Object Drawing.Size(900,620)
+$form.StartPosition='CenterScreen';$form.BackColor=$script:Back;$form.ForeColor=$script:Text
+$form.Font=New-Object Drawing.Font('Segoe UI',9)
+$header=New-Object Windows.Forms.Panel;$header.Dock='Top';$header.Height=76;$header.BackColor=$script:Panel;$form.Controls.Add($header)
+$brand=New-Object Windows.Forms.Label;$brand.Text='WINDOWS NEXT';$brand.AutoSize=$true
+$brand.Location=New-Object Drawing.Point(22,10);$brand.ForeColor=$script:Accent
+$brand.Font=New-Object Drawing.Font('Segoe UI Semibold',20);$header.Controls.Add($brand)
+$tag=New-Object Windows.Forms.Label;$tag.Text='Обслуживание • производительность • восстановление';$tag.AutoSize=$true
+$tag.Location=New-Object Drawing.Point(25,48);$tag.ForeColor=$script:Muted;$header.Controls.Add($tag)
+$tabs=New-Object Windows.Forms.TabControl;$tabs.Dock='Fill';$tabs.Font=New-Object Drawing.Font('Segoe UI',10);$form.Controls.Add($tabs)
+$home=New-Object Windows.Forms.TabPage;$home.Text='Главная';$home.BackColor=$script:Back
+$maint=New-Object Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
+$drivers=New-Object Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
+$logs=New-Object Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
+[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$logs))
+
+$homePanel=New-Object Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
+$homeBar=New-Object Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
+$refresh=New-WnButton 'Обновить обзор' 180;$saveReport=New-WnButton 'Сохранить отчёт' 180;$openReports=New-WnButton 'Папка отчётов' 160
+$homeBar.Controls.AddRange(@($refresh,$saveReport,$openReports))
+$overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview)
+
+$maintPanel=New-Object Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
+$maintBar=New-Object Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=112;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
+$clean=New-WnButton 'Очистить временные файлы' 240
+$optimize=New-WnButton 'Оптимизировать системный диск' 270
+$scan=New-WnButton 'Проверить диск' 170
+$check=New-WnButton 'Проверить Windows' 190
+$repair=New-WnButton 'Восстановить Windows' 220
+$restore=New-WnButton 'Создать точку восстановления' 250
+$maintBar.Controls.AddRange(@($clean,$optimize,$scan,$check,$repair,$restore))
+$maintInfo=New-WnTextBox;$maintInfo.Dock='Fill';$maintPanel.Controls.Add($maintInfo)
+$status=New-Object Windows.Forms.Label;$status.Dock='Bottom';$status.Height=30;$status.ForeColor=$script:Muted
+$status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status)
+
+$driverPanel=New-Object Windows.Forms.Panel;$driverPanel.Dock='Fill';$driverPanel.Padding=New-Object Windows.Forms.Padding(12);$drivers.Controls.Add($driverPanel)
+$driverBar=New-Object Windows.Forms.FlowLayoutPanel;$driverBar.Dock='Top';$driverBar.Height=54;$driverPanel.Controls.Add($driverBar)
+$backup=New-WnButton 'Создать резервную копию драйверов' 300;$backupFolder=New-WnButton 'Открыть папку копий' 200
+$driverBar.Controls.AddRange(@($backup,$backupFolder))
+$driverGrid=New-Object Windows.Forms.DataGridView;$driverGrid.Dock='Fill';$driverGrid.ReadOnly=$true
+$driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$driverGrid.AutoSizeColumnsMode='Fill'
+$driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
+$driverNote=New-Object Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
+$driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote)
+
+$logPanel=New-Object Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
+$logBar=New-Object Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
+$logRefresh=New-WnButton 'Обновить журнал' 180;$logFolder=New-WnButton 'Папка журналов' 180;$logBar.Controls.AddRange(@($logRefresh,$logFolder))
+$logText=New-WnTextBox;$logText.Dock='Fill';$logPanel.Controls.Add($logText)
+
+$script:TaskTimer=New-Object Windows.Forms.Timer;$script:TaskTimer.Interval=1000
+$script:TaskTimer.Add_Tick({
+ if($null -eq $script:ActiveTask){$script:TaskTimer.Stop();return}
+ if(Test-Path -LiteralPath $script:ActiveTask.ResultFile -PathType Leaf){
+  try{$result=Get-Content -LiteralPath $script:ActiveTask.ResultFile -Raw|ConvertFrom-Json
+   Remove-Item -LiteralPath $script:ActiveTask.ResultFile -Force -ErrorAction SilentlyContinue
+   Finish-WnTask -Result $result
+  }catch{$status.Text=('Ошибка чтения результата: {0}' -f $_.Exception.Message);$script:TaskTimer.Stop();$script:ActiveTask=$null}
+ }elseif($script:ActiveTask.Process.HasExited){
+  $status.Text=('Задача завершилась с кодом {0}; файл результата отсутствует.' -f $script:ActiveTask.Process.ExitCode)
+  $script:TaskTimer.Stop();$script:ActiveTask=$null
+ }
+})
+
+$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers}catch{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$saveReport.Add_Click({
+ try{$audit=Get-WnAudit;$plan=Get-WnComponentPlan -Audit $audit -ManifestPath (Join-Path $script:AppRoot 'manifest\components.json')
+  $report=Export-WnAuditReport -Audit $audit -ComponentPlan $plan -OutputDirectory $script:ReportsPath
+  [Windows.Forms.MessageBox]::Show(('Отчёт сохранён: '+$report.TextPath),'Windows Next','OK','Information')|Out-Null
+ }catch{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
+})
+$openReports.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:ReportsPath)})
+$clean.Add_Click({
+ $choice=[Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
+})
+$optimize.Add_Click({
+ $letter=$env:SystemDrive.TrimEnd(':')
+ $choice=[Windows.Forms.MessageBox]::Show(("Запустить штатную оптимизацию Windows для {0}:? Windows сама выберет операцию для SSD или HDD." -f $letter),'Оптимизация','YesNo','Question')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeSystemDrive -Caption 'Оптимизация системного диска' -Letter $letter -Admin}
+})
+$scan.Add_Click({
+ $letter=$env:SystemDrive.TrimEnd(':')
+ $choice=[Windows.Forms.MessageBox]::Show(("Запустить онлайн-проверку NTFS тома {0}:?" -f $letter),'Проверка диска','YesNo','Question')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanSystemDrive -Caption 'Проверка системного диска' -Letter $letter -Admin}
+})
+$check.Add_Click({
+ $choice=[Windows.Forms.MessageBox]::Show('Запустить DISM ScanHealth и SFC VerifyOnly? Это проверка без исправления файлов.','Проверка Windows','YesNo','Question')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CheckWindows -Caption 'Проверка Windows' -Admin}
+})
+$repair.Add_Click({
+ $choice=[Windows.Forms.MessageBox]::Show('Сначала будет создана точка восстановления. Если это не удастся, ремонт остановится. Затем DISM RestoreHealth и SFC Scannow могут изменить системные файлы. Продолжить?','Восстановление','YesNo','Warning')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action RepairWindows -Caption 'Восстановление Windows' -Admin}
+})
+$restore.Add_Click({
+ $choice=[Windows.Forms.MessageBox]::Show('Создать точку восстановления? Для этого должна быть включена защита системы.','Точка восстановления','YesNo','Question')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CreateRestorePoint -Caption 'Создание точки восстановления' -Admin}
+})
+$backup.Add_Click({
+ $base=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
+ $destination=Join-Path $base (Get-Date -Format 'yyyyMMdd-HHmmss')
+ $choice=[Windows.Forms.MessageBox]::Show(('Экспортировать сторонние драйверы Windows в папку: '+[Environment]::NewLine+$destination+[Environment]::NewLine+'Текущие драйверы не изменяются.'),'Резервная копия','YesNo','Question')
+ if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ExportDrivers -Caption 'Резервное копирование драйверов' -Destination $destination -Admin}
+})
+$backupFolder.Add_Click({
+ $folder=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
+ [void][IO.Directory]::CreateDirectory($folder);Start-Process explorer.exe -ArgumentList ('"{0}"' -f $folder)
+})
+$logRefresh.Add_Click({Update-WnLogs})
+$logFolder.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:LogsPath)})
+
+$form.Add_Shown({
+ try{
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnLogs
+  $maintInfo.Text=@'
+РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
+
+- Очистка пользовательских временных файлов старше 14 дней.
+- Штатная оптимизация системного SSD/HDD средствами Windows.
+- Онлайн-проверка NTFS-накопителя.
+- Проверка целостности Windows через DISM и SFC.
+- Восстановление Windows с обязательной точкой восстановления.
+- Резервное копирование сторонних драйверов с индексом и SHA-256.
+
+Каждая операция пишет журнал. Системные операции требуют подтверждения UAC.
+Неодобренные драйверы не устанавливаются автоматически. BIOS, прошивки, напряжение,
+частоты и температурные ограничения не изменяются.
+'@
+ }catch{$overview.Text=('Ошибка загрузки: {0}' -f $_.Exception.Message)}
+})
+[void]$form.ShowDialog()
