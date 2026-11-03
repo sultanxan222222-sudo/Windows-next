@@ -6,45 +6,6 @@ BeforeAll {
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Performance.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Startup.psm1') -Force
-
-    It 'backs up and restores a user startup entry without overwriting an existing value' {
-        $backupDirectory = Join-Path $TestDrive 'startup-backups'
-        $valueName = 'WindowsNext-Pester-' + [guid]::NewGuid().ToString('N')
-        $originalValue = '"C:\Windows\System32\notepad.exe" --windows-next-test'
-        $registryPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
-        $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($registryPath)
-        try {
-            $key.SetValue($valueName, $originalValue, [Microsoft.Win32.RegistryValueKind]::ExpandString)
-            $entry = @(Get-WnStartupEntries | Where-Object { $_.Name -eq $valueName })
-            $entry.Count | Should -Be 1
-            $entry[0].CanDisable | Should -BeTrue
-
-            $disabled = Disable-WnStartupEntry -Entry $entry[0] -BackupDirectory $backupDirectory
-            $disabled.Disabled | Should -BeTrue
-            $key.GetValueNames() | Should -Not -Contain $valueName
-            Test-Path -LiteralPath $disabled.BackupFile | Should -BeTrue
-
-            $restored = Restore-WnStartupEntry -BackupFile $disabled.BackupFile -BackupDirectory $backupDirectory
-            $restored.Restored | Should -BeTrue
-            $key.GetValue($valueName, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) | Should -Be $originalValue
-            $key.GetValueKind($valueName) | Should -Be ([Microsoft.Win32.RegistryValueKind]::ExpandString)
-        }
-        finally {
-            $key.DeleteValue($valueName, $false)
-            $key.Dispose()
-        }
-    }
-
-    It 'refuses to disable machine-wide startup entries' {
-        $entry = [pscustomobject]@{
-            Name = 'ProtectedMachineEntry'
-            Command = 'example.exe'
-            RegistryPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'
-            CanDisable = $false
-        }
-        { Disable-WnStartupEntry -Entry $entry -BackupDirectory (Join-Path $TestDrive 'blocked') } | Should -Throw
-    }
-
 }
 
 Describe 'Windows Next source validation' {
@@ -180,4 +141,43 @@ Describe 'Windows Next source validation' {
         $plan.Components[0].Decision | Should -Be 'KEEP_CURRENT'
         $plan.Components[0].AutomaticInstall | Should -BeFalse
     }
+
+    It 'backs up and restores a user startup entry without overwriting an existing value' {
+        $backupDirectory = Join-Path $TestDrive 'startup-backups'
+        $valueName = 'WindowsNext-Pester-' + [guid]::NewGuid().ToString('N')
+        $originalValue = '"C:\Windows\System32\notepad.exe" --windows-next-test'
+        $registryPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+        $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($registryPath)
+        try {
+            $key.SetValue($valueName, $originalValue, [Microsoft.Win32.RegistryValueKind]::ExpandString)
+            $entry = @(Get-WnStartupEntries | Where-Object { $_.Name -eq $valueName })
+            $entry.Count | Should -Be 1
+            $entry[0].CanDisable | Should -BeTrue
+
+            $disabled = Disable-WnStartupEntry -Entry $entry[0] -BackupDirectory $backupDirectory
+            $disabled.Disabled | Should -BeTrue
+            $key.GetValueNames() | Should -Not -Contain $valueName
+            Test-Path -LiteralPath $disabled.BackupFile | Should -BeTrue
+
+            $restored = Restore-WnStartupEntry -BackupFile $disabled.BackupFile -BackupDirectory $backupDirectory
+            $restored.Restored | Should -BeTrue
+            $key.GetValue($valueName, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) | Should -Be $originalValue
+            $key.GetValueKind($valueName) | Should -Be ([Microsoft.Win32.RegistryValueKind]::ExpandString)
+        }
+        finally {
+            $key.DeleteValue($valueName, $false)
+            $key.Dispose()
+        }
+    }
+
+    It 'refuses to disable machine-wide startup entries' {
+        $entry = [pscustomobject]@{
+            Name = 'ProtectedMachineEntry'
+            Command = 'example.exe'
+            RegistryPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'
+            CanDisable = $false
+        }
+        { Disable-WnStartupEntry -Entry $entry -BackupDirectory (Join-Path $TestDrive 'blocked') } | Should -Throw
+    }
+
 }
