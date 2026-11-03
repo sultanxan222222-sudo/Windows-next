@@ -31,30 +31,30 @@ if(-not[string]::IsNullOrWhiteSpace($Task)){
 }
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-[System.Windows.Forms.Application]::EnableVisualStyles()
-$script:Back=[Drawing.Color]::FromArgb(24,29,38)
-$script:Panel=[Drawing.Color]::FromArgb(34,41,53)
-$script:Text=[Drawing.Color]::FromArgb(232,236,242)
-$script:Muted=[Drawing.Color]::FromArgb(161,171,186)
-$script:Accent=[Drawing.Color]::FromArgb(236,178,52)
+[System.System.Windows.Forms.Application]::EnableVisualStyles()
+$script:Back=[System.Drawing.Color]::FromArgb(24,29,38)
+$script:Panel=[System.Drawing.Color]::FromArgb(34,41,53)
+$script:Text=[System.Drawing.Color]::FromArgb(232,236,242)
+$script:Muted=[System.Drawing.Color]::FromArgb(161,171,186)
+$script:Accent=[System.Drawing.Color]::FromArgb(236,178,52)
 $script:ActiveTask=$null
 
 function New-WnButton([string]$Caption,[int]$Width=210){
- $b=New-Object Windows.Forms.Button
+ $b=New-Object System.Windows.Forms.Button
  $b.Text=$Caption;$b.Width=$Width;$b.Height=42
- $b.Margin=New-Object Windows.Forms.Padding(6)
+ $b.Margin=New-Object System.Windows.Forms.Padding(6)
  $b.FlatStyle='Flat';$b.FlatAppearance.BorderColor=$script:Accent
  $b.BackColor=$script:Panel;$b.ForeColor=$script:Text
- $b.Font=New-Object Drawing.Font('Segoe UI',9)
- $b.Cursor=[Windows.Forms.Cursors]::Hand
+ $b.Font=New-Object System.Drawing.Font('Segoe UI',9)
+ $b.Cursor=[System.Windows.Forms.Cursors]::Hand
  return $b
 }
 function New-WnTextBox{
- $t=New-Object Windows.Forms.TextBox
+ $t=New-Object System.Windows.Forms.TextBox
  $t.Multiline=$true;$t.ReadOnly=$true;$t.ScrollBars='Vertical'
- $t.Dock='Fill';$t.BackColor=[Drawing.Color]::FromArgb(17,21,28)
+ $t.Dock='Fill';$t.BackColor=[System.Drawing.Color]::FromArgb(17,21,28)
  $t.ForeColor=$script:Text;$t.BorderStyle='FixedSingle'
- $t.Font=New-Object Drawing.Font('Consolas',9)
+ $t.Font=New-Object System.Drawing.Font('Consolas',9)
  return $t
 }
 function Get-WnOverview{
@@ -107,63 +107,63 @@ function Finish-WnTask([object]$Result){
    $message+=[Environment]::NewLine+'Папка: '+[string]$Result.Result.Destination
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   }
-  [Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
+  [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Information')|Out-Null
  }else{
   $status.Text=('Ошибка: {0}' -f $Result.Action)
   $message='Операция остановлена: '+[string]$Result.Error
   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
-  [Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Error')|Out-Null
+  [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Error')|Out-Null
  }
  $script:ActiveTask=$null;Update-WnLogs
 }
 function Start-WnTask{
  param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[switch]$Admin)
- if($null -ne $script:ActiveTask){[Windows.Forms.MessageBox]::Show('Уже выполняется другая задача.','Windows Next','OK','Information')|Out-Null;return}
+ if($null -ne $script:ActiveTask){[System.Windows.Forms.MessageBox]::Show('Уже выполняется другая задача.','Windows Next','OK','Information')|Out-Null;return}
  $resultDir=Join-Path $env:LOCALAPPDATA 'WindowsNext\Results'
  [void][IO.Directory]::CreateDirectory($resultDir)
  $resultFile=Join-Path $resultDir (([guid]::NewGuid().ToString('N'))+'.json')
  $powershell=Join-Path $PSHOME 'powershell.exe'
- $args='-NoLogo -NoProfile -WindowStyle Hidden -File "{0}" -Task {1} -ResultFile "{2}"' -f $PSCommandPath,$Action,$resultFile
- if($Destination){$args+=' -Destination "{0}"' -f $Destination.Replace('"','')}
- if($Letter){$args+=' -DriveLetter {0}' -f $Letter}
+ $argumentString='-NoLogo -NoProfile -WindowStyle Hidden -File "{0}" -Task {1} -ResultFile "{2}"' -f $PSCommandPath,$Action,$resultFile
+ if($Destination){$argumentString+=' -Destination "{0}"' -f $Destination.Replace('"','')}
+ if($Letter){$argumentString+=' -DriveLetter {0}' -f $Letter}
  try{
-  $start=@{FilePath=$powershell;ArgumentList=$args;PassThru=$true;WindowStyle='Hidden'}
+  $start=@{FilePath=$powershell;ArgumentList=$argumentString;PassThru=$true;WindowStyle='Hidden'}
   if($Admin){$start.Verb='RunAs'}
   $proc=Start-Process @start
   $script:ActiveTask=[pscustomobject]@{Process=$proc;ResultFile=$resultFile;Caption=$Caption}
   $status.Text=('Выполняется: {0}' -f $Caption);$script:TaskTimer.Start()
  }catch [System.ComponentModel.Win32Exception]{
   if($_.Exception.NativeErrorCode -eq 1223){$status.Text='Запрос UAC отменён. Изменений не выполнено.'}
-  else{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
- }catch{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
+  else{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
+ }catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
 }
 
-$form=New-Object Windows.Forms.Form
+$form=New-Object System.Windows.Forms.Form
 $form.Text='Windows Next — центр обслуживания'
-$form.Size=New-Object Drawing.Size(1120,760);$form.MinimumSize=New-Object Drawing.Size(900,620)
+$form.Size=New-Object System.Drawing.Size(1120,760);$form.MinimumSize=New-Object System.Drawing.Size(900,620)
 $form.StartPosition='CenterScreen';$form.BackColor=$script:Back;$form.ForeColor=$script:Text
-$form.Font=New-Object Drawing.Font('Segoe UI',9)
-$header=New-Object Windows.Forms.Panel;$header.Dock='Top';$header.Height=76;$header.BackColor=$script:Panel;$form.Controls.Add($header)
-$brand=New-Object Windows.Forms.Label;$brand.Text='WINDOWS NEXT';$brand.AutoSize=$true
-$brand.Location=New-Object Drawing.Point(22,10);$brand.ForeColor=$script:Accent
-$brand.Font=New-Object Drawing.Font('Segoe UI Semibold',20);$header.Controls.Add($brand)
-$tag=New-Object Windows.Forms.Label;$tag.Text='Обслуживание • производительность • восстановление';$tag.AutoSize=$true
-$tag.Location=New-Object Drawing.Point(25,48);$tag.ForeColor=$script:Muted;$header.Controls.Add($tag)
-$tabs=New-Object Windows.Forms.TabControl;$tabs.Dock='Fill';$tabs.Font=New-Object Drawing.Font('Segoe UI',10);$form.Controls.Add($tabs)
-$home=New-Object Windows.Forms.TabPage;$home.Text='Главная';$home.BackColor=$script:Back
-$maint=New-Object Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
-$drivers=New-Object Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
-$logs=New-Object Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
+$form.Font=New-Object System.Drawing.Font('Segoe UI',9)
+$header=New-Object System.Windows.Forms.Panel;$header.Dock='Top';$header.Height=76;$header.BackColor=$script:Panel;$form.Controls.Add($header)
+$brand=New-Object System.Windows.Forms.Label;$brand.Text='WINDOWS NEXT';$brand.AutoSize=$true
+$brand.Location=New-Object System.Drawing.Point(22,10);$brand.ForeColor=$script:Accent
+$brand.Font=New-Object System.Drawing.Font('Segoe UI Semibold',20);$header.Controls.Add($brand)
+$tag=New-Object System.Windows.Forms.Label;$tag.Text='Обслуживание • производительность • восстановление';$tag.AutoSize=$true
+$tag.Location=New-Object System.Drawing.Point(25,48);$tag.ForeColor=$script:Muted;$header.Controls.Add($tag)
+$tabs=New-Object System.Windows.Forms.TabControl;$tabs.Dock='Fill';$tabs.Font=New-Object System.Drawing.Font('Segoe UI',10);$form.Controls.Add($tabs)
+$home=New-Object System.Windows.Forms.TabPage;$home.Text='Главная';$home.BackColor=$script:Back
+$maint=New-Object System.Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
+$drivers=New-Object System.Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
+$logs=New-Object System.Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
 [void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$logs))
 
-$homePanel=New-Object Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
-$homeBar=New-Object Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
+$homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object System.Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
+$homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
 $refresh=New-WnButton 'Обновить обзор' 180;$saveReport=New-WnButton 'Сохранить отчёт' 180;$openReports=New-WnButton 'Папка отчётов' 160
 $homeBar.Controls.AddRange(@($refresh,$saveReport,$openReports))
 $overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview)
 
-$maintPanel=New-Object Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
-$maintBar=New-Object Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=112;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
+$maintPanel=New-Object System.Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object System.Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
+$maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=112;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
 $clean=New-WnButton 'Очистить временные файлы' 240
 $optimize=New-WnButton 'Оптимизировать системный диск' 270
 $scan=New-WnButton 'Проверить диск' 170
@@ -172,25 +172,25 @@ $repair=New-WnButton 'Восстановить Windows' 220
 $restore=New-WnButton 'Создать точку восстановления' 250
 $maintBar.Controls.AddRange(@($clean,$optimize,$scan,$check,$repair,$restore))
 $maintInfo=New-WnTextBox;$maintInfo.Dock='Fill';$maintPanel.Controls.Add($maintInfo)
-$status=New-Object Windows.Forms.Label;$status.Dock='Bottom';$status.Height=30;$status.ForeColor=$script:Muted
+$status=New-Object System.Windows.Forms.Label;$status.Dock='Bottom';$status.Height=30;$status.ForeColor=$script:Muted
 $status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status)
 
-$driverPanel=New-Object Windows.Forms.Panel;$driverPanel.Dock='Fill';$driverPanel.Padding=New-Object Windows.Forms.Padding(12);$drivers.Controls.Add($driverPanel)
-$driverBar=New-Object Windows.Forms.FlowLayoutPanel;$driverBar.Dock='Top';$driverBar.Height=54;$driverPanel.Controls.Add($driverBar)
+$driverPanel=New-Object System.Windows.Forms.Panel;$driverPanel.Dock='Fill';$driverPanel.Padding=New-Object System.Windows.Forms.Padding(12);$drivers.Controls.Add($driverPanel)
+$driverBar=New-Object System.Windows.Forms.FlowLayoutPanel;$driverBar.Dock='Top';$driverBar.Height=54;$driverPanel.Controls.Add($driverBar)
 $backup=New-WnButton 'Создать резервную копию драйверов' 300;$backupFolder=New-WnButton 'Открыть папку копий' 200
 $driverBar.Controls.AddRange(@($backup,$backupFolder))
-$driverGrid=New-Object Windows.Forms.DataGridView;$driverGrid.Dock='Fill';$driverGrid.ReadOnly=$true
+$driverGrid=New-Object System.Windows.Forms.DataGridView;$driverGrid.Dock='Fill';$driverGrid.ReadOnly=$true
 $driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$driverGrid.AutoSizeColumnsMode='Fill'
-$driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
-$driverNote=New-Object Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
+$driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
+$driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
 $driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote)
 
-$logPanel=New-Object Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
-$logBar=New-Object Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
+$logPanel=New-Object System.Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object System.Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
+$logBar=New-Object System.Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
 $logRefresh=New-WnButton 'Обновить журнал' 180;$logFolder=New-WnButton 'Папка журналов' 180;$logBar.Controls.AddRange(@($logRefresh,$logFolder))
 $logText=New-WnTextBox;$logText.Dock='Fill';$logPanel.Controls.Add($logText)
 
-$script:TaskTimer=New-Object Windows.Forms.Timer;$script:TaskTimer.Interval=1000
+$script:TaskTimer=New-Object System.Windows.Forms.Timer;$script:TaskTimer.Interval=1000
 $script:TaskTimer.Add_Tick({
  if($null -eq $script:ActiveTask){$script:TaskTimer.Stop();return}
  if(Test-Path -LiteralPath $script:ActiveTask.ResultFile -PathType Leaf){
@@ -204,45 +204,45 @@ $script:TaskTimer.Add_Tick({
  }
 })
 
-$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers}catch{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
 $saveReport.Add_Click({
  try{$audit=Get-WnAudit;$plan=Get-WnComponentPlan -Audit $audit -ManifestPath (Join-Path $script:AppRoot 'manifest\components.json')
   $report=Export-WnAuditReport -Audit $audit -ComponentPlan $plan -OutputDirectory $script:ReportsPath
-  [Windows.Forms.MessageBox]::Show(('Отчёт сохранён: '+$report.TextPath),'Windows Next','OK','Information')|Out-Null
- }catch{[Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
+  [System.Windows.Forms.MessageBox]::Show(('Отчёт сохранён: '+$report.TextPath),'Windows Next','OK','Information')|Out-Null
+ }catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}
 })
 $openReports.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:ReportsPath)})
 $clean.Add_Click({
- $choice=[Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
 })
 $optimize.Add_Click({
  $letter=$env:SystemDrive.TrimEnd(':')
- $choice=[Windows.Forms.MessageBox]::Show(("Запустить штатную оптимизацию Windows для {0}:? Windows сама выберет операцию для SSD или HDD." -f $letter),'Оптимизация','YesNo','Question')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeSystemDrive -Caption 'Оптимизация системного диска' -Letter $letter -Admin}
+ $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить штатную оптимизацию Windows для {0}:? Windows сама выберет операцию для SSD или HDD." -f $letter),'Оптимизация','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeSystemDrive -Caption 'Оптимизация системного диска' -Letter $letter -Admin}
 })
 $scan.Add_Click({
  $letter=$env:SystemDrive.TrimEnd(':')
- $choice=[Windows.Forms.MessageBox]::Show(("Запустить онлайн-проверку NTFS тома {0}:?" -f $letter),'Проверка диска','YesNo','Question')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanSystemDrive -Caption 'Проверка системного диска' -Letter $letter -Admin}
+ $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить онлайн-проверку NTFS тома {0}:?" -f $letter),'Проверка диска','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanSystemDrive -Caption 'Проверка системного диска' -Letter $letter -Admin}
 })
 $check.Add_Click({
- $choice=[Windows.Forms.MessageBox]::Show('Запустить DISM ScanHealth и SFC VerifyOnly? Это проверка без исправления файлов.','Проверка Windows','YesNo','Question')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CheckWindows -Caption 'Проверка Windows' -Admin}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Запустить DISM ScanHealth и SFC VerifyOnly? Это проверка без исправления файлов.','Проверка Windows','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CheckWindows -Caption 'Проверка Windows' -Admin}
 })
 $repair.Add_Click({
- $choice=[Windows.Forms.MessageBox]::Show('Сначала будет создана точка восстановления. Если это не удастся, ремонт остановится. Затем DISM RestoreHealth и SFC Scannow могут изменить системные файлы. Продолжить?','Восстановление','YesNo','Warning')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action RepairWindows -Caption 'Восстановление Windows' -Admin}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Сначала будет создана точка восстановления. Если это не удастся, ремонт остановится. Затем DISM RestoreHealth и SFC Scannow могут изменить системные файлы. Продолжить?','Восстановление','YesNo','Warning')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action RepairWindows -Caption 'Восстановление Windows' -Admin}
 })
 $restore.Add_Click({
- $choice=[Windows.Forms.MessageBox]::Show('Создать точку восстановления? Для этого должна быть включена защита системы.','Точка восстановления','YesNo','Question')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CreateRestorePoint -Caption 'Создание точки восстановления' -Admin}
+ $choice=[System.Windows.Forms.MessageBox]::Show('Создать точку восстановления? Для этого должна быть включена защита системы.','Точка восстановления','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CreateRestorePoint -Caption 'Создание точки восстановления' -Admin}
 })
 $backup.Add_Click({
  $base=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
  $destination=Join-Path $base (Get-Date -Format 'yyyyMMdd-HHmmss')
- $choice=[Windows.Forms.MessageBox]::Show(('Экспортировать сторонние драйверы Windows в папку: '+[Environment]::NewLine+$destination+[Environment]::NewLine+'Текущие драйверы не изменяются.'),'Резервная копия','YesNo','Question')
- if($choice -eq [Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ExportDrivers -Caption 'Резервное копирование драйверов' -Destination $destination -Admin}
+ $choice=[System.Windows.Forms.MessageBox]::Show(('Экспортировать сторонние драйверы Windows в папку: '+[Environment]::NewLine+$destination+[Environment]::NewLine+'Текущие драйверы не изменяются.'),'Резервная копия','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ExportDrivers -Caption 'Резервное копирование драйверов' -Destination $destination -Admin}
 })
 $backupFolder.Add_Click({
  $folder=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
