@@ -231,4 +231,14 @@ Describe 'Windows Next source validation' {
         $module | Should -Match 'At least 2 GB of free space'
     }
 
+
+    It 'enables only the built-in NetFx3 optional feature without forcing a reboot' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Components.psm1') -Raw
+        $module | Should -Match '/Enable-Feature'
+        $module | Should -Match '/FeatureName:NetFx3'
+        $module | Should -Match '/NoRestart'
+        $module | Should -Match 'Get-WindowsOptionalFeature'
+        $module | Should -Match 'NetFx3 state after operation'
+    }
+
 }
