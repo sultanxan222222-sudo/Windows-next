@@ -37,7 +37,8 @@ jobs:
       - name: Build single EXE installer
         shell: pwsh
         run: |
-          $compiler = Join-Path $env:ProgramFiles '(x86)\Inno Setup 6\ISCC.exe'
+          $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          $compiler = Join-Path $programFilesX86 'Inno Setup 6\ISCC.exe'
           if (-not (Test-Path -LiteralPath $compiler)) {
             $compiler = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
           }
