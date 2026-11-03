@@ -223,7 +223,7 @@ function Invoke-WnMaintenanceAction {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint')]
+        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint', 'InstallVCRuntime')]
         [string]$Action,
         [string]$Destination,
         [string]$DriveLetter
@@ -240,6 +240,7 @@ function Invoke-WnMaintenanceAction {
             'CheckWindows' { Invoke-WnWindowsHealthCheck -LogPath $logPath }
             'RepairWindows' { Invoke-WnWindowsRepair -LogPath $logPath }
             'CreateRestorePoint' { Invoke-WnCreateRestorePoint -LogPath $logPath }
+            'InstallVCRuntime' { Invoke-WnInstallVCRuntime -LogPath $logPath }
         }
         Write-WnTaskLog -Path $logPath -Message 'Task completed successfully.'
         return [pscustomobject]@{ Success = $true; Action = $Action; LogPath = $logPath; Result = $result; Error = $null }
