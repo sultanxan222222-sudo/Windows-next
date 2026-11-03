@@ -406,7 +406,7 @@ $saveReport.Add_Click({
 })
 $openReports.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:ReportsPath)})
 $clean.Add_Click({
- $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
+ $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы старше 14 дней, лежащие непосредственно в %LOCALAPPDATA%\Temp? Вложенные папки, загрузки, документы и системные каталоги не затрагиваются.','Очистка','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
 })
 $refreshVolumes.Add_Click({Update-WnVolumePicker})
