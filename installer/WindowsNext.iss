@@ -1,5 +1,5 @@
 #define ProductName "Windows Next"
-#define ProductVersion "0.3.0"
+#define ProductVersion "0.4.0"
 #define ProductPublisher "Windows Next Project"
 
 [Setup]
@@ -22,7 +22,7 @@ SolidCompression=yes
 UsePreviousAppDir=yes
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion=0.3.0.0
+VersionInfoVersion=0.4.0.0
 VersionInfoCompany={#ProductPublisher}
 VersionInfoDescription=Windows Next desktop maintenance suite
 VersionInfoProductName={#ProductName}
