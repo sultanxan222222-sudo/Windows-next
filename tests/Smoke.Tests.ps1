@@ -221,6 +221,9 @@ Describe 'Windows Next source validation' {
         $module | Should -Match 'NewerThanPreviousDriver'
         $module | Should -Match 'DeviceManagerStatusOK'
         $module | Should -Match 'ConfigManagerErrorCode'
+        $module | Should -Match 'DriverSignaturePresent'
+        $module | Should -Match '\$session\.CreateUpdateDownloader\(\)'
+        $module | Should -Match '\$session\.CreateUpdateInstaller\(\)'
     }
 
     It 'restricts automated driver discovery to Windows Update driver entries' {
