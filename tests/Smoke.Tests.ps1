@@ -228,7 +228,8 @@ Describe 'Windows Next source validation' {
         $module | Should -Match "IsInstalled=0 and Type='Driver' and IsHidden=0"
         $module | Should -Match 'IncludePotentiallySupersededUpdates'
         $module | Should -Match 'Install-WnWindowsUpdateDriver'
-        $module | Should -Match 'At least 2 GB of free space'
+        $maintenance = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Raw
+        $maintenance | Should -Match 'At least 2 GB of free space'
     }
 
 
