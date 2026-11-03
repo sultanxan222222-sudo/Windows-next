@@ -53,5 +53,5 @@ Name: "{autodesktop}\Windows Next - Maintenance Center"; Filename: "{app}\Run-Wi
 Name: "{group}\Uninstall Windows Next"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "{app}\Run-WindowsNext.cmd"; Description: "Launch Windows Next Maintenance Center"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\Run-WindowsNext.cmd"; Description: "Launch Windows Next Maintenance Center"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
