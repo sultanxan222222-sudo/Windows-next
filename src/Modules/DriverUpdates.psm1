@@ -55,7 +55,8 @@ function Get-WnRawWindowsUpdateDriverCandidates {
             $allNewer = $true
             foreach ($device in $devices) {
                 $hardwareIds = @($device.HardwareID | ForEach-Object { [string]$_ })
-                if (-not ($hardwareIds | Where-Object { [string]::Equals($_, $hardwareId, [StringComparison]::OrdinalIgnoreCase) })) { continue }
+                $exactHardwareMatch = [bool]($hardwareIds | Where-Object { [string]::Equals($_, $hardwareId, [StringComparison]::OrdinalIgnoreCase) })
+                if (-not $exactHardwareMatch) { continue }
 
                 $current = @($signedDrivers | Where-Object { [string]::Equals([string]$_.DeviceID, [string]$device.PNPDeviceID, [StringComparison]::OrdinalIgnoreCase) } |
                     Sort-Object DriverDate -Descending | Select-Object -First 1)
@@ -64,7 +65,7 @@ function Get-WnRawWindowsUpdateDriverCandidates {
                     break
                 }
                 $currentDate = [datetime]$current[0].DriverDate
-                if ($updateDate -le $currentDate) {
+                if (-not (Test-WnDriverCandidateApplicability -DeviceHardwareIds $hardwareIds -UpdateHardwareId $hardwareId -CurrentDriverDate $currentDate -UpdateDriverDate $updateDate)) {
                     $allNewer = $false
                     break
                 }
