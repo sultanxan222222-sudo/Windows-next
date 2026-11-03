@@ -48,10 +48,10 @@ Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs 
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Windows Next — диагностика"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"
+Name: "{group}\Windows Next - diagnostics"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"
 Name: "{autodesktop}\Windows Next — диагностика"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"; Tasks: desktopicon
-Name: "{group}\Удалить Windows Next"; Filename: "{uninstallexe}"
+Name: "{group}\Uninstall Windows Next"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "{app}\Run-WindowsNext.cmd"; Description: "Запустить Windows Next и проверить компьютер"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{app}\Run-WindowsNext.cmd"; Description: "Run Windows Next and scan this computer"; Flags: postinstall nowait skipifsilent runasoriginaluser
 
