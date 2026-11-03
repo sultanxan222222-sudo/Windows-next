@@ -40,7 +40,11 @@ Windows 11 Pro 21H2 is out of servicing. A supported OS path is a separate engin
 
 The GitHub Actions workflow `/.github/workflows/build-installer.yml` runs PowerShell analysis and Pester tests, then compiles a single Inno Setup EXE and uploads its SHA-256 sidecar.
 
-Current product version: **0.3.0**.
+Current product version: **0.4.0**.
+
+## Performance assessment (0.4.0)
+
+The dashboard now includes a read-only performance assessment covering installed memory modules, free space on the Windows volume, common Run-key startup entries, and the Windows build. It makes no configuration changes and does not disable startup items. The findings help prioritize safe next steps; they are not a benchmark and do not promise a frame-rate or speed increase.
 
 For local compilation on Windows with Inno Setup 6:
 
