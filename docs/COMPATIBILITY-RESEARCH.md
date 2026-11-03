@@ -16,6 +16,15 @@ Research snapshot: 2026-11-03. This document is a decision record, not permissio
 - Ethernet: Broadcom NetLink Gigabit, PCI\VEN_14E4&DEV_1692&SUBSYS_07811025.
 - Bluetooth USB module: USB\VID_0489&PID_E04E.
 
+## Operating system servicing
+
+The confirmed Windows 11 Pro build 22000.2600 belongs to version 21H2. Microsoft ended servicing for Windows 11 Home and Pro 21H2 on 2023-10-10; that release no longer receives security updates. This is a material security issue for the target machine.
+
+Windows Next must include a separate OS servicing assessment before any system-maintenance release. It must not silently perform a feature upgrade, bypass CPU support requirements, or rewrite boot/firmware configuration. The correct upgrade path must be checked against the exact CPU, device drivers, user files, and supported Windows release before it is offered.
+
+Source:
+- https://learn.microsoft.com/ru-ru/lifecycle/announcements/windows-11-21h2-end-of-servicing
+
 ## Graphics driver decisions
 
 ### Intel HD Graphics 4600
