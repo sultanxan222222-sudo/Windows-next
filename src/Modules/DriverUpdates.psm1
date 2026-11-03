@@ -92,6 +92,7 @@ function Get-WnRawWindowsUpdateDriverCandidates {
                 DriverDate = $updateDate
                 MatchedDevices = @($matchingDevices.ToArray())
                 Update = $update
+                Session = $session
             })
         }
         catch {
@@ -149,6 +150,7 @@ function Install-WnWindowsUpdateDriver {
     }
 
     $update = $candidate[0].Update
+    $session = $candidate[0].Session
     if (-not [bool]$update.EulaAccepted) {
         $update.AcceptEula()
     }
@@ -162,7 +164,7 @@ function Install-WnWindowsUpdateDriver {
     [void]$collection.Add($update)
 
     if (-not [bool]$update.IsDownloaded) {
-        $downloader = (New-Object -ComObject Microsoft.Update.Session).CreateUpdateDownloader()
+        $downloader = $session.CreateUpdateDownloader()
         $downloader.Updates = $collection
         $downloadResult = $downloader.Download()
         if ([int]$downloadResult.ResultCode -ne 2 -or -not [bool]$update.IsDownloaded) {
@@ -170,7 +172,7 @@ function Install-WnWindowsUpdateDriver {
         }
     }
 
-    $installer = (New-Object -ComObject Microsoft.Update.Session).CreateUpdateInstaller()
+    $installer = $session.CreateUpdateInstaller()
     $installer.Updates = $collection
     $installer.AllowSourcePrompts = $false
     $installer.IsForced = $false
