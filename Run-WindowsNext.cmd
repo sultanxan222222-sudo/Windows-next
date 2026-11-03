@@ -1,23 +1,43 @@
 @echo off
 setlocal
-title Windows Next — Inventory
+title Windows Next - Hardware Inventory
 
-where powershell.exe >nul 2>nul
-if errorlevel 1 (
-    echo Windows PowerShell 5.1 was not found.
+set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
+set "SCRIPT=%~dp0src\WindowsNext.ps1"
+
+echo.
+echo ==========================================
+echo          WINDOWS NEXT - INVENTORY
+echo ==========================================
+echo This first-stage tool is READ ONLY.
+echo It does not install drivers or change Windows.
+echo.
+
+if not exist "%PS%" (
+    echo ERROR: Windows PowerShell 5.1 was not found.
     echo No system changes were made.
     pause
     exit /b 1
 )
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0src\WindowsNext.ps1"
+if not exist "%SCRIPT%" (
+    echo ERROR: src\WindowsNext.ps1 is missing.
+    echo Make sure the ZIP archive was fully extracted.
+    pause
+    exit /b 1
+)
+
+"%PS%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"
 set "RESULT=%ERRORLEVEL%"
 
 echo.
 if not "%RESULT%"=="0" (
-    echo Inventory did not finish successfully. No driver installation was attempted.
+    echo Windows Next stopped with an error.
+    echo Check %%LOCALAPPDATA%%\WindowsNext\Logs for the diagnostic log.
 ) else (
-    echo Inventory finished. No driver installation was attempted.
+    echo Inventory finished successfully.
+    echo Check %%LOCALAPPDATA%%\WindowsNext\Reports for the reports.
 )
+echo.
 pause
 exit /b %RESULT%
