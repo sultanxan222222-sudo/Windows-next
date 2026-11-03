@@ -89,6 +89,10 @@ Describe 'Windows Next source validation' {
         } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
         $audit = [pscustomobject]@{
+            OperatingSystem = [pscustomobject]@{
+                DisplayVersion = '21H2'
+                BuildNumber = '22000'
+            }
             Graphics = @(
                 [pscustomobject]@{
                     Name = 'Test GPU'
@@ -102,6 +106,7 @@ Describe 'Windows Next source validation' {
 
         $plan = Get-WnComponentPlan -Audit $audit -ManifestPath $manifestPath
         $plan.InstallationEnabled | Should -BeFalse
+        $plan.Warnings[0] | Should -Match 'ended servicing'
         $plan.Components[0].Decision | Should -Be 'KEEP_CURRENT'
         $plan.Components[0].AutomaticInstall | Should -BeFalse
     }
