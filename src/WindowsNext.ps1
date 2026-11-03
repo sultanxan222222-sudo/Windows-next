@@ -5,7 +5,8 @@ param(
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
- [string]$ResultFile=''
+ [string]$ResultFile='',
+ [string]$SelectionFile=''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -14,14 +15,14 @@ $script:ReportsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Reports'
 $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 [void][IO.Directory]::CreateDirectory($script:ReportsPath)
 [void][IO.Directory]::CreateDirectory($script:LogsPath)
-$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Components.psm1','Maintenance.psm1','Performance.psm1','Startup.psm1')
+$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Components.psm1','DriverUpdates.psm1','Maintenance.psm1','Performance.psm1','Startup.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
  if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
  Import-Module $path -Force -ErrorAction Stop
 }
 if (-not [string]::IsNullOrWhiteSpace($Task)){
- $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter
+ $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter -SelectionFile $SelectionFile
  if (-not [string]::IsNullOrWhiteSpace($ResultFile)){
   $parent=Split-Path -Parent $ResultFile
   [void][IO.Directory]::CreateDirectory($parent)
@@ -203,7 +204,7 @@ function Finish-WnTask([object]$Result){
  $script:ActiveTask=$null;Update-WnLogs;try{Update-WnComponents}catch{}
 }
 function Start-WnTask{
- param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[switch]$Admin)
+ param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[string]$SelectionFile='',[switch]$Admin)
  if($null -ne $script:ActiveTask){[System.Windows.Forms.MessageBox]::Show('Уже выполняется другая задача.','Windows Next','OK','Information')|Out-Null;return}
  $resultDir=Join-Path $env:LOCALAPPDATA 'WindowsNext\Results'
  [void][IO.Directory]::CreateDirectory($resultDir)
@@ -212,6 +213,7 @@ function Start-WnTask{
  $argumentString='-NoLogo -NoProfile -WindowStyle Hidden -File "{0}" -Task {1} -ResultFile "{2}"' -f $PSCommandPath,$Action,$resultFile
  if($Destination){$argumentString+=' -Destination "{0}"' -f $Destination.Replace('"','')}
  if($Letter){$argumentString+=' -DriveLetter {0}' -f $Letter}
+ if($SelectionFile){$argumentString+=' -SelectionFile "{0}"' -f $SelectionFile.Replace('"','')}
  try{
   $start=@{FilePath=$powershell;ArgumentList=$argumentString;PassThru=$true;WindowStyle='Hidden'}
   if($Admin){$start.Verb='RunAs'}
