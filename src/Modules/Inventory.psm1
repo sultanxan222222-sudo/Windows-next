@@ -265,15 +265,24 @@ function Get-WnAudit {
     $osInfo = $null
     if ($null -ne $os) {
         $installDate = $null
+        $displayVersion = $null
         if ($os.InstallDate) {
             try { $installDate = ([datetime]$os.InstallDate).ToString('yyyy-MM-dd') } catch { $installDate = $null }
         }
+        try {
+            $currentVersion = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name DisplayVersion -ErrorAction Stop
+            $displayVersion = [string]$currentVersion.DisplayVersion
+        }
+        catch {
+            $displayVersion = $null
+        }
         $osInfo = [pscustomobject]@{
-            Caption       = [string]$os.Caption
-            Version       = [string]$os.Version
-            BuildNumber   = [string]$os.BuildNumber
-            Architecture  = [string]$os.OSArchitecture
-            InstallDate   = $installDate
+            Caption        = [string]$os.Caption
+            Version        = [string]$os.Version
+            DisplayVersion = $displayVersion
+            BuildNumber    = [string]$os.BuildNumber
+            Architecture   = [string]$os.OSArchitecture
+            InstallDate    = $installDate
         }
     }
 
