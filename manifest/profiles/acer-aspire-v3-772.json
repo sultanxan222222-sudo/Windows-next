@@ -1,0 +1,27 @@
+{
+  "profileId": "acer-aspire-v3-772-user-reported",
+  "profilePurpose": "planning-hint-only",
+  "mustConfirmAgainstLiveInventory": true,
+  "reportedHardware": {
+    "manufacturer": "Acer",
+    "model": "Aspire V3-772",
+    "processor": "Intel Core i5-4200M",
+    "integratedGraphics": "Intel HD Graphics 4600",
+    "discreteGraphics": "NVIDIA GeForce GT 750M",
+    "installedMemoryGB": 8
+  },
+  "reportedOperatingSystem": {
+    "name": "Windows 11",
+    "architecture": "x64",
+    "exactBuild": "unknown"
+  },
+  "safetyConstraints": {
+    "modifyBiosOrUefi": false,
+    "modifyVbiosOrFirmware": false,
+    "changeVoltageOrOverclock": false,
+    "disableThermalProtection": false,
+    "disableDriverSignatureEnforcement": false,
+    "disableWindowsSecurity": false
+  },
+  "important": "This profile must never be used alone to select, force, or install a driver. Live hardware IDs and the exact OS build are mandatory."
+}
