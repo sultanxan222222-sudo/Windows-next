@@ -14,7 +14,7 @@ $script:ReportsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Reports'
 $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 [void][IO.Directory]::CreateDirectory($script:ReportsPath)
 [void][IO.Directory]::CreateDirectory($script:LogsPath)
-$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1')
+$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1','Performance.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
  if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
@@ -75,6 +75,10 @@ function Get-WnOverview{
  foreach($x in @($audit.Memory.Modules)){$lines.Add(('{0} | {1} ГБ | {2} МГц | {3}' -f $x.Manufacturer,$x.CapacityGB,$x.SpeedMHz,$x.PartNumber))}
  $lines.Add('');$lines.Add('СЕТЬ / BLUETOOTH')
  foreach($x in @($audit.NetworkDevices)){$lines.Add(('{0} | {1} | {2}' -f $x.Name,$x.Class,$x.DriverVersion))}
+ $performance=Get-WnPerformanceAssessment
+ $lines.Add('');$lines.Add('ОЦЕНКА ПРОИЗВОДИТЕЛЬНОСТИ (БЕЗ ИЗМЕНЕНИЙ)')
+ foreach($finding in @($performance.Findings)){$lines.Add(('{0} — {1}: {2}' -f $finding.Area,$finding.Status,$finding.Detail))}
+ $lines.Add('Режим оценки: только чтение. Настройки Windows не изменялись.')
  $lines.Add('');$lines.Add('СОВМЕСТИМОСТЬ КОМПОНЕНТОВ')
  foreach($w in @($plan.Warnings)){$lines.Add(('ВНИМАНИЕ: {0}' -f $w))}
  foreach($x in @($plan.Components)){$lines.Add(('{0}: {1}' -f $x.DisplayName,$x.Decision))}
