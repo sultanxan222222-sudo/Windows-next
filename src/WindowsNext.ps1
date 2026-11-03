@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
- [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint','InstallVCRuntime','CheckDriverUpdates','InstallSelectedDriver')]
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint','InstallVCRuntime','InstallNetFx3','CheckDriverUpdates','InstallSelectedDriver')]
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
@@ -164,6 +164,8 @@ function Update-WnComponents {
  $lines.Add('Windows Next загружает только официальные установщики Microsoft, проверяет действительную цифровую подпись Microsoft Corporation и SHA-256, пропускает уже более новую версию и удаляет временные установщики после завершения.')
  $lines.Add('Это исправляет недостающие библиотеки приложений, но не повышает DirectX или возможности видеокарты и не обещает прирост FPS.')
  $lines.Add('Нужен интернет. Установка выполняется только после подтверждения и запроса UAC.')
+ try{$netfx=Get-WnNetFx3Status;$lines.Add((' .NET Framework 3.5: {0}' -f $netfx.State))}catch{$lines.Add('.NET Framework 3.5: проверить не удалось — '+$_.Exception.Message)}
+ $lines.Add('Для старых программ и игр доступно отдельное включение штатной функции Windows .NET Framework 3.5. Данные и драйверы не затрагиваются; используется DISM и источник компонентов, настроенный в Windows.')
  $componentInfo.Text=$lines -join [Environment]::NewLine
 }
 function Update-WnStartupGrid {
@@ -217,6 +219,11 @@ function Finish-WnTask([object]$Result){
    $message='Проверенные библиотеки Visual C++:'
    foreach($component in @($Result.Result.Components)){$message+=[Environment]::NewLine+('{0}: {1} ({2})' -f $component.Architecture,$component.Status,$component.Version)}
    if($Result.Result.RebootRequired){$message+=[Environment]::NewLine+'Для завершения установки требуется перезагрузка.'}
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
+  if($Result.Action -eq 'InstallNetFx3' -and $Result.Result){
+   $message='.NET Framework 3.5: '+[string]$Result.Result.State
+   if($Result.Result.RebootRequired){$message+=[Environment]::NewLine+'Для завершения требуется перезагрузка. Автоматически перезагружать компьютер Windows Next не будет.'}
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   }
   if($Result.Action -eq 'CheckDriverUpdates' -and $Result.Result){
@@ -348,7 +355,8 @@ $componentPanel=New-Object System.Windows.Forms.Panel;$componentPanel.Dock='Fill
 $componentBar=New-Object System.Windows.Forms.FlowLayoutPanel;$componentBar.Dock='Top';$componentBar.Height=54;$componentPanel.Controls.Add($componentBar)
 $componentRefresh=New-WnButton 'Проверить библиотеки' 210
 $componentInstall=New-WnButton 'Установить / обновить Visual C++' 300
-$componentBar.Controls.AddRange(@($componentRefresh,$componentInstall))
+$componentNetFx=New-WnButton 'Включить .NET Framework 3.5' 250
+$componentBar.Controls.AddRange(@($componentRefresh,$componentInstall,$componentNetFx))
 $componentInfo=New-WnTextBox;$componentInfo.Dock='Fill';$componentPanel.Controls.Add($componentInfo);$componentPanel.Controls.SetChildIndex($componentBar,0)
 
 $startupPanel=New-Object System.Windows.Forms.Panel;$startupPanel.Dock='Fill';$startupPanel.Padding=New-Object System.Windows.Forms.Padding(12);$startup.Controls.Add($startupPanel)
@@ -457,6 +465,10 @@ $driverUpdateInstall.Add_Click({
  Start-WnTask -Action InstallSelectedDriver -Caption ('Установка драйвера: '+$title) -SelectionFile $selectionFile -Admin
 })
 $componentRefresh.Add_Click({try{Update-WnComponents}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$componentNetFx.Add_Click({
+ $choice=[System.Windows.Forms.MessageBox]::Show('Включить встроенную дополнительную функцию Windows .NET Framework 3.5? Она нужна некоторым старым программам и играм. Windows загрузит необходимые компоненты через настроенный источник Windows Update. Нужен интернет; автоматической перезагрузки не будет.','Дополнительная функция Windows','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action InstallNetFx3 -Caption 'Включение .NET Framework 3.5' -Admin}
+})
 $componentInstall.Add_Click({
  $choice=[System.Windows.Forms.MessageBox]::Show('Загрузить официальные Microsoft Visual C++ Runtime x86 и x64, проверить цифровую подпись и установить только при отсутствии или более старой версии? Нужен интернет.','Игровые библиотеки','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action InstallVCRuntime -Caption 'Установка Microsoft Visual C++ Runtime' -Admin}
