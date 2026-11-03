@@ -309,7 +309,7 @@ function Get-WnAudit {
 
     [pscustomobject]@{
         SchemaVersion   = '1.1'
-        ToolVersion     = '0.2.0'
+        ToolVersion     = '0.3.0'
         CollectedAtUtc  = (Get-Date).ToUniversalTime().ToString('o')
         CollectionMode  = 'ReadOnly'
         OperatingSystem = $osInfo

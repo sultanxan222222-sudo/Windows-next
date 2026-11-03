@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
- [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeSystemDrive','ScanSystemDrive','CheckWindows','RepairWindows','CreateRestorePoint')]
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint')]
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
@@ -17,12 +17,12 @@ $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 $moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
- if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
+ if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
  Import-Module $path -Force -ErrorAction Stop
 }
-if(-not[string]::IsNullOrWhiteSpace($Task)){
+if (-not [string]::IsNullOrWhiteSpace($Task)){
  $result=Invoke-WnMaintenanceAction -Action $Task -Destination $Destination -DriveLetter $DriveLetter
- if(-not[string]::IsNullOrWhiteSpace($ResultFile)){
+ if (-not [string]::IsNullOrWhiteSpace($ResultFile)){
   $parent=Split-Path -Parent $ResultFile
   [void][IO.Directory]::CreateDirectory($parent)
   $result|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ResultFile -Encoding UTF8
@@ -85,6 +85,34 @@ function Update-WnDrivers{
  foreach($x in @($audit.Graphics)){$rows+=[pscustomobject]@{Устройство=$x.Name;Класс='Графика';Версия=$x.DriverVersion;Дата=$x.DriverDate;ID=$x.InstanceId}}
  foreach($x in @($audit.NetworkDevices)){$rows+=[pscustomobject]@{Устройство=$x.Name;Класс=$x.Class;Версия=$x.DriverVersion;Дата=$x.DriverDate;ID=$x.InstanceId}}
  $driverGrid.DataSource=$rows
+}
+function Update-WnVolumePicker{
+ $previous=''
+ try{if($volumePicker.SelectedValue){$previous=[string]$volumePicker.SelectedValue}}catch{}
+ $items=@()
+ try{
+  $volumes=@(Get-Volume -ErrorAction Stop|Where-Object{$_.DriveType -eq 'Fixed' -and -not[string]::IsNullOrWhiteSpace([string]$_.DriveLetter)})
+  foreach($v in $volumes){
+   $letter=[string]$v.DriveLetter
+   $free=[math]::Round(([double]$v.SizeRemaining/1GB),1)
+   $total=[math]::Round(([double]$v.Size/1GB),1)
+   $label=[string]$v.FileSystemLabel
+   if([string]::IsNullOrWhiteSpace($label)){$label='Локальный диск'}
+   $systemMark=''
+   if($letter -eq $env:SystemDrive.TrimEnd(':')){$systemMark=' [Windows]'}
+   $display=('{0}: {1}{2} — {3}, свободно {4} из {5} ГБ' -f $letter,$label,$systemMark,$v.FileSystem,$free,$total)
+   $items+=[pscustomobject]@{Display=$display;DriveLetter=$letter;FileSystem=[string]$v.FileSystem}
+  }
+ }catch{}
+ $volumePicker.DataSource=$null
+ $volumePicker.DisplayMember='Display'
+ $volumePicker.ValueMember='DriveLetter'
+ $volumePicker.DataSource=$items
+ if($items.Count -gt 0){
+  $target=$previous
+  if([string]::IsNullOrWhiteSpace($target)){$target=$env:SystemDrive.TrimEnd(':')}
+  if($items.DriveLetter -contains $target){$volumePicker.SelectedValue=$target}else{$volumePicker.SelectedIndex=0}
+ }
 }
 function Update-WnLogs{
  $files=@(Get-ChildItem -LiteralPath $script:LogsPath -Filter 'WindowsNext-*.log' -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 12)
@@ -160,20 +188,26 @@ $homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePan
 $homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
 $refresh=New-WnButton 'Обновить обзор' 180;$saveReport=New-WnButton 'Сохранить отчёт' 180;$openReports=New-WnButton 'Папка отчётов' 160
 $homeBar.Controls.AddRange(@($refresh,$saveReport,$openReports))
-$overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview)
+$overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview);$homePanel.Controls.SetChildIndex($homeBar,0)
 
 $maintPanel=New-Object System.Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object System.Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
-$maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=112;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
+$maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=160;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
+$volumeLabel=New-Object System.Windows.Forms.Label
+$volumeLabel.Text='Выбери диск:';$volumeLabel.AutoSize=$true;$volumeLabel.Margin=New-Object System.Windows.Forms.Padding(8,14,2,2);$volumeLabel.ForeColor=$script:Text
+$volumePicker=New-Object System.Windows.Forms.ComboBox
+$volumePicker.Width=430;$volumePicker.Height=32;$volumePicker.DropDownStyle=[System.Windows.Forms.ComboBoxStyle]::DropDownList
+$volumePicker.BackColor=$script:Panel;$volumePicker.ForeColor=$script:Text
+$refreshVolumes=New-WnButton 'Обновить диски' 160
 $clean=New-WnButton 'Очистить временные файлы' 240
-$optimize=New-WnButton 'Оптимизировать системный диск' 270
-$scan=New-WnButton 'Проверить диск' 170
+$optimize=New-WnButton 'Оптимизировать выбранный диск' 270
+$scan=New-WnButton 'Проверить выбранный диск' 210
 $check=New-WnButton 'Проверить Windows' 190
 $repair=New-WnButton 'Восстановить Windows' 220
 $restore=New-WnButton 'Создать точку восстановления' 250
-$maintBar.Controls.AddRange(@($clean,$optimize,$scan,$check,$repair,$restore))
+$maintBar.Controls.AddRange(@($volumeLabel,$volumePicker,$refreshVolumes,$clean,$optimize,$scan,$check,$repair,$restore))
 $maintInfo=New-WnTextBox;$maintInfo.Dock='Fill';$maintPanel.Controls.Add($maintInfo)
 $status=New-Object System.Windows.Forms.Label;$status.Dock='Bottom';$status.Height=30;$status.ForeColor=$script:Muted
-$status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status)
+$status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status);$maintPanel.Controls.SetChildIndex($maintBar,0);$maintPanel.Controls.SetChildIndex($status,1)
 
 $driverPanel=New-Object System.Windows.Forms.Panel;$driverPanel.Dock='Fill';$driverPanel.Padding=New-Object System.Windows.Forms.Padding(12);$drivers.Controls.Add($driverPanel)
 $driverBar=New-Object System.Windows.Forms.FlowLayoutPanel;$driverBar.Dock='Top';$driverBar.Height=54;$driverPanel.Controls.Add($driverBar)
@@ -183,12 +217,12 @@ $driverGrid=New-Object System.Windows.Forms.DataGridView;$driverGrid.Dock='Fill'
 $driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$driverGrid.AutoSizeColumnsMode='Fill'
 $driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
 $driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
-$driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote)
+$driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote);$driverPanel.Controls.SetChildIndex($driverBar,0);$driverPanel.Controls.SetChildIndex($driverNote,1)
 
 $logPanel=New-Object System.Windows.Forms.Panel;$logPanel.Dock='Fill';$logPanel.Padding=New-Object System.Windows.Forms.Padding(12);$logs.Controls.Add($logPanel)
 $logBar=New-Object System.Windows.Forms.FlowLayoutPanel;$logBar.Dock='Top';$logBar.Height=48;$logPanel.Controls.Add($logBar)
 $logRefresh=New-WnButton 'Обновить журнал' 180;$logFolder=New-WnButton 'Папка журналов' 180;$logBar.Controls.AddRange(@($logRefresh,$logFolder))
-$logText=New-WnTextBox;$logText.Dock='Fill';$logPanel.Controls.Add($logText)
+$logText=New-WnTextBox;$logText.Dock='Fill';$logPanel.Controls.Add($logText);$logPanel.Controls.SetChildIndex($logBar,0)
 
 $script:TaskTimer=New-Object System.Windows.Forms.Timer;$script:TaskTimer.Interval=1000
 $script:TaskTimer.Add_Tick({
@@ -204,7 +238,7 @@ $script:TaskTimer.Add_Tick({
  }
 })
 
-$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
 $saveReport.Add_Click({
  try{$audit=Get-WnAudit;$plan=Get-WnComponentPlan -Audit $audit -ManifestPath (Join-Path $script:AppRoot 'manifest\components.json')
   $report=Export-WnAuditReport -Audit $audit -ComponentPlan $plan -OutputDirectory $script:ReportsPath
@@ -216,15 +250,18 @@ $clean.Add_Click({
  $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
 })
+$refreshVolumes.Add_Click({Update-WnVolumePicker})
 $optimize.Add_Click({
- $letter=$env:SystemDrive.TrimEnd(':')
+ $letter=[string]$volumePicker.SelectedValue
+ if([string]::IsNullOrWhiteSpace($letter)){[System.Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
  $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить штатную оптимизацию Windows для {0}:? Windows сама выберет операцию для SSD или HDD." -f $letter),'Оптимизация','YesNo','Question')
- if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeSystemDrive -Caption 'Оптимизация системного диска' -Letter $letter -Admin}
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeVolume -Caption ('Оптимизация диска '+$letter+':') -Letter $letter -Admin}
 })
 $scan.Add_Click({
- $letter=$env:SystemDrive.TrimEnd(':')
+ $letter=[string]$volumePicker.SelectedValue
+ if([string]::IsNullOrWhiteSpace($letter)){[System.Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
  $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить онлайн-проверку NTFS тома {0}:?" -f $letter),'Проверка диска','YesNo','Question')
- if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanSystemDrive -Caption 'Проверка системного диска' -Letter $letter -Admin}
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanVolume -Caption ('Проверка диска '+$letter+':') -Letter $letter -Admin}
 })
 $check.Add_Click({
  $choice=[System.Windows.Forms.MessageBox]::Show('Запустить DISM ScanHealth и SFC VerifyOnly? Это проверка без исправления файлов.','Проверка Windows','YesNo','Question')
@@ -253,13 +290,13 @@ $logFolder.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $scri
 
 $form.Add_Shown({
  try{
-  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnLogs
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnLogs
   $maintInfo.Text=@'
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
 - Очистка пользовательских временных файлов старше 14 дней.
-- Штатная оптимизация системного SSD/HDD средствами Windows.
-- Онлайн-проверка NTFS-накопителя.
+- Штатная оптимизация любого выбранного внутреннего SSD/HDD средствами Windows.
+- Онлайн-проверка выбранного NTFS-накопителя.
 - Проверка целостности Windows через DISM и SFC.
 - Восстановление Windows с обязательной точкой восстановления.
 - Резервное копирование сторонних драйверов с индексом и SHA-256.

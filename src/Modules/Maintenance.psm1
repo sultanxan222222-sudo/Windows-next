@@ -131,7 +131,7 @@ function Invoke-WnDriverBackup {
     return [pscustomobject]@{ PackageCount = $drivers.Count; Destination = $Destination }
 }
 
-function Invoke-WnOptimizeSystemDrive {
+function Invoke-WnOptimizeVolume {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$DriveLetter, [Parameter(Mandatory)][string]$LogPath)
 
@@ -145,10 +145,10 @@ function Invoke-WnOptimizeSystemDrive {
     Optimize-Volume -DriveLetter $DriveLetter -Verbose -ErrorAction Stop 4>&1 |
         Out-String | Add-Content -LiteralPath $LogPath -Encoding UTF8
     Write-WnTaskLog -Path $LogPath -Message 'Windows volume optimization completed.'
-    return [pscustomobject]@{ DriveLetter = $DriveLetter; FileSystem = $volume.FileSystem; MediaType = [string]$volume.DriveType }
+    return [pscustomobject]@{ DriveLetter = $DriveLetter; FileSystem = $volume.FileSystem; DriveType = [string]$volume.DriveType }
 }
 
-function Invoke-WnScanSystemDrive {
+function Invoke-WnScanVolume {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$DriveLetter, [Parameter(Mandatory)][string]$LogPath)
 
@@ -223,7 +223,7 @@ function Invoke-WnMaintenanceAction {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeSystemDrive', 'ScanSystemDrive', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint')]
+        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint')]
         [string]$Action,
         [string]$Destination,
         [string]$DriveLetter
@@ -235,8 +235,8 @@ function Invoke-WnMaintenanceAction {
         $result = switch ($Action) {
             'CleanUserTemp' { Invoke-WnTempCleanup -LogPath $logPath }
             'ExportDrivers' { Invoke-WnDriverBackup -Destination $Destination -LogPath $logPath }
-            'OptimizeSystemDrive' { Invoke-WnOptimizeSystemDrive -DriveLetter $DriveLetter -LogPath $logPath }
-            'ScanSystemDrive' { Invoke-WnScanSystemDrive -DriveLetter $DriveLetter -LogPath $logPath }
+            'OptimizeVolume' { Invoke-WnOptimizeVolume -DriveLetter $DriveLetter -LogPath $logPath }
+            'ScanVolume' { Invoke-WnScanVolume -DriveLetter $DriveLetter -LogPath $logPath }
             'CheckWindows' { Invoke-WnWindowsHealthCheck -LogPath $logPath }
             'RepairWindows' { Invoke-WnWindowsRepair -LogPath $logPath }
             'CreateRestorePoint' { Invoke-WnCreateRestorePoint -LogPath $logPath }

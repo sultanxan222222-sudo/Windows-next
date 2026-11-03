@@ -7,8 +7,8 @@
 The application is a Russian-language Windows Forms desktop program with four areas: system overview, maintenance, driver inventory/backup, and logs.
 
 - **Temporary-file cleanup:** removes only the current user's LocalAppData\Temp files older than 14 days. It does not clean Downloads, Documents, Windows folders, or recent files.
-- **Drive optimization:** invokes Windows' own Optimize-Volume operation on the system volume. Windows decides whether to issue SSD optimization/TRIM or an HDD optimization.
-- **Drive scan:** runs the supported online scan for NTFS and does not schedule an offline repair at reboot.
+- **Drive optimization:** invokes Windows' own Optimize-Volume operation on any selected fixed local volume, so the SSD and HDD can be handled separately. Windows decides whether to issue SSD optimization/TRIM or an HDD optimization.
+- **Drive scan:** runs the supported online scan for any selected NTFS volume and does not schedule an offline repair at reboot.
 - **Windows health check:** runs DISM ScanHealth and SFC VerifyOnly without repairing files.
 - **Windows repair:** asks for confirmation, requires a successful System Restore checkpoint, then runs DISM RestoreHealth and SFC Scannow.
 - **Restore point:** creates a named Windows restore point when System Protection is available.
