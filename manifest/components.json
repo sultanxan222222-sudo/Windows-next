@@ -1,45 +1,79 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "project": "Windows Next",
-  "manifestStatus": "planning-only",
-  "globalInstallPolicy": "blocked-until-reviewed",
-  "targetOs": {
-    "family": "Windows",
-    "requiredArchitecture": "x64",
-    "exactBuildMustBeChecked": true
+  "target": {
+    "manufacturer": "Acer",
+    "model": "Aspire V3-772",
+    "windowsEdition": "Windows 11 Pro",
+    "windowsVersion": "10.0",
+    "windowsBuild": "22000.2600",
+    "architecture": "x64"
   },
+  "installationEnabled": false,
+  "globalInstallPolicy": "read-only-until-driver-packages-pass-review",
   "components": [
     {
       "id": "intel-hd-graphics",
-      "displayName": "Intel HD Graphics",
-      "vendor": "Intel",
-      "status": "blocked",
-      "approvedPackages": [],
-      "requiredEvidence": [
-        "Exact live PCI hardware ID including subsystem identity",
-        "Exact Windows edition, version, and build",
-        "Official package source and release notes",
-        "Package and catalog signature verification",
-        "SHA-256 recorded in the release manifest",
-        "Documented compatibility and rollback plan"
-      ],
-      "reason": "No driver package is approved before the live inventory is reviewed."
+      "displayName": "Intel HD Graphics 4600",
+      "inventoryClass": "Graphics",
+      "expectedHardwareIdPrefix": "PCI\\VEN_8086&DEV_0416&SUBSYS_07811025",
+      "installedDriverVersion": "10.18.15.4248",
+      "approvalStatus": "blocked",
+      "packages": [],
+      "blockReason": "Intel documents security problems in the legacy 15.40 branch and DirectX 12 deprecation from 15.40.44.5107. No Windows 11 package is approved for this exact adapter and build."
     },
     {
       "id": "nvidia-geforce",
-      "displayName": "NVIDIA GeForce",
-      "vendor": "NVIDIA",
-      "status": "blocked",
-      "approvedPackages": [],
-      "requiredEvidence": [
-        "Exact live PCI hardware ID including subsystem identity",
-        "Exact Windows edition, version, and build",
-        "Official package source and supported product list",
-        "Package and catalog signature verification",
-        "SHA-256 recorded in the release manifest",
-        "Documented compatibility and rollback plan"
-      ],
-      "reason": "No driver package is approved before the live inventory is reviewed."
+      "displayName": "NVIDIA GeForce GT 750M",
+      "inventoryClass": "Graphics",
+      "expectedHardwareIdPrefix": "PCI\\VEN_10DE&DEV_0FE4&SUBSYS_07811025",
+      "installedDriverVersion": "21.21.13.7654",
+      "approvalStatus": "blocked",
+      "packages": [],
+      "blockReason": "NVIDIA ended mobile Kepler Game Ready support in 2019 and critical security updates in 2020. The 425.31 reference package targets Windows 10, not this Windows 11 build. Keep the current OEM driver pending a validated replacement."
+    },
+    {
+      "id": "qualcomm-atheros-wlan",
+      "displayName": "Qualcomm Atheros AR5BWB222 Wi-Fi",
+      "inventoryClass": "NetworkDevices",
+      "expectedHardwareIdPrefix": "PCI\\VEN_168C&DEV_0034&SUBSYS_E052105B",
+      "installedDriverVersion": "10.0.0.352",
+      "approvalStatus": "blocked",
+      "packages": [],
+      "blockReason": "Microsoft Update Catalog lists a newer matching-subsystem Windows 10 package, but Windows 11 compatibility and rollback have not been verified. Keep current."
+    },
+    {
+      "id": "broadcom-ethernet",
+      "displayName": "Broadcom NetLink Gigabit Ethernet",
+      "inventoryClass": "NetworkDevices",
+      "expectedHardwareIdPrefix": "PCI\\VEN_14E4&DEV_1692&SUBSYS_07811025",
+      "installedDriverVersion": "15.6.1.3",
+      "approvalStatus": "blocked",
+      "packages": [],
+      "blockReason": "No newer package has been verified against this exact Acer subsystem ID and Windows 11 build. Keep current."
+    },
+    {
+      "id": "qualcomm-bluetooth",
+      "displayName": "Qualcomm Atheros Bluetooth USB Module",
+      "inventoryClass": "NetworkDevices",
+      "expectedHardwareIdPrefix": "USB\\VID_0489&PID_E04E",
+      "installedDriverVersion": "10.0.1.7",
+      "approvalStatus": "blocked",
+      "packages": [],
+      "blockReason": "No Windows 11 package with exact hardware-ID, signature, and rollback evidence is approved. Keep current."
     }
-  ]
+  ],
+  "safety": {
+    "allowBiosOrFirmware": false,
+    "allowVoltageOrOverclocking": false,
+    "allowThermalLimitChanges": false,
+    "allowSecurityDisabling": false,
+    "allowDriverSignatureBypass": false,
+    "automaticDriverInstall": false,
+    "requireExactHardwareId": true,
+    "requireExactOsBuild": true,
+    "requireAuthenticodeAndCatalogValidation": true,
+    "requireSha256": true,
+    "requireRecoveryPlan": true
+  }
 }
