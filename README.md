@@ -14,7 +14,8 @@ The first implementation deliberately performs **no system changes**. It collect
 2. Double-click `Run-WindowsNext.cmd`.
 3. The script writes JSON and readable TXT reports under:
    `%LOCALAPPDATA%\WindowsNext\Reports`
-4. Share the report from the newest run for hardware-specific driver analysis.
+4. After a successful run, Windows Next copies the readable TXT report to the clipboard automatically. Return to the ChatGPT conversation, click the message box, press **Ctrl+V**, then Enter.
+5. If the inventory fails, the error details are copied to the clipboard when Windows allows it; paste them into the conversation the same way.
 
 It does not require administrator rights. It does not download drivers, change the registry, install or remove drivers, alter power settings, or touch BIOS/firmware.
 
