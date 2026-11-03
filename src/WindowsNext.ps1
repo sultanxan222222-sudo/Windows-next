@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
- [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeSystemDrive','ScanSystemDrive','CheckWindows','RepairWindows','CreateRestorePoint')]
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint')]
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
@@ -86,6 +86,34 @@ function Update-WnDrivers{
  foreach($x in @($audit.NetworkDevices)){$rows+=[pscustomobject]@{Устройство=$x.Name;Класс=$x.Class;Версия=$x.DriverVersion;Дата=$x.DriverDate;ID=$x.InstanceId}}
  $driverGrid.DataSource=$rows
 }
+function Update-WnVolumePicker{
+ $previous=''
+ try{if($volumePicker.SelectedValue){$previous=[string]$volumePicker.SelectedValue}}catch{}
+ $items=@()
+ try{
+  $volumes=@(Get-Volume -ErrorAction Stop|Where-Object{$_.DriveType -eq 'Fixed' -and -not[string]::IsNullOrWhiteSpace([string]$_.DriveLetter)})
+  foreach($v in $volumes){
+   $letter=[string]$v.DriveLetter
+   $free=[math]::Round(([double]$v.SizeRemaining/1GB),1)
+   $total=[math]::Round(([double]$v.Size/1GB),1)
+   $label=[string]$v.FileSystemLabel
+   if([string]::IsNullOrWhiteSpace($label)){$label='Локальный диск'}
+   $systemMark=''
+   if($letter -eq $env:SystemDrive.TrimEnd(':')){$systemMark=' [Windows]'}
+   $display=('{0}: {1}{2} — {3}, свободно {4} из {5} ГБ' -f $letter,$label,$systemMark,$v.FileSystem,$free,$total)
+   $items+=[pscustomobject]@{Display=$display;DriveLetter=$letter;FileSystem=[string]$v.FileSystem}
+  }
+ }catch{}
+ $volumePicker.DataSource=$null
+ $volumePicker.DisplayMember='Display'
+ $volumePicker.ValueMember='DriveLetter'
+ $volumePicker.DataSource=$items
+ if($items.Count -gt 0){
+  $target=$previous
+  if([string]::IsNullOrWhiteSpace($target)){$target=$env:SystemDrive.TrimEnd(':')}
+  if($items.DriveLetter -contains $target){$volumePicker.SelectedValue=$target}else{$volumePicker.SelectedIndex=0}
+ }
+}
 function Update-WnLogs{
  $files=@(Get-ChildItem -LiteralPath $script:LogsPath -Filter 'WindowsNext-*.log' -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 12)
  $out=New-Object 'System.Collections.Generic.List[string]'
@@ -164,13 +192,19 @@ $overview=New-WnTextBox;$overview.Dock='Fill';$homePanel.Controls.Add($overview)
 
 $maintPanel=New-Object System.Windows.Forms.Panel;$maintPanel.Dock='Fill';$maintPanel.Padding=New-Object System.Windows.Forms.Padding(12);$maint.Controls.Add($maintPanel)
 $maintBar=New-Object System.Windows.Forms.FlowLayoutPanel;$maintBar.Dock='Top';$maintBar.Height=112;$maintBar.WrapContents=$true;$maintPanel.Controls.Add($maintBar)
+$volumeLabel=New-Object System.Windows.Forms.Label
+$volumeLabel.Text='Выбери диск:';$volumeLabel.AutoSize=$true;$volumeLabel.Margin=New-Object System.Windows.Forms.Padding(8,14,2,2);$volumeLabel.ForeColor=$script:Text
+$volumePicker=New-Object System.Windows.Forms.ComboBox
+$volumePicker.Width=430;$volumePicker.Height=32;$volumePicker.DropDownStyle=[System.Windows.Forms.ComboBoxStyle]::DropDownList
+$volumePicker.BackColor=$script:Panel;$volumePicker.ForeColor=$script:Text
+$refreshVolumes=New-WnButton 'Обновить диски' 160
 $clean=New-WnButton 'Очистить временные файлы' 240
-$optimize=New-WnButton 'Оптимизировать системный диск' 270
-$scan=New-WnButton 'Проверить диск' 170
+$optimize=New-WnButton 'Оптимизировать выбранный диск' 270
+$scan=New-WnButton 'Проверить выбранный диск' 210
 $check=New-WnButton 'Проверить Windows' 190
 $repair=New-WnButton 'Восстановить Windows' 220
 $restore=New-WnButton 'Создать точку восстановления' 250
-$maintBar.Controls.AddRange(@($clean,$optimize,$scan,$check,$repair,$restore))
+$maintBar.Controls.AddRange(@($volumeLabel,$volumePicker,$refreshVolumes,$clean,$optimize,$scan,$check,$repair,$restore))
 $maintInfo=New-WnTextBox;$maintInfo.Dock='Fill';$maintPanel.Controls.Add($maintInfo)
 $status=New-Object System.Windows.Forms.Label;$status.Dock='Bottom';$status.Height=30;$status.ForeColor=$script:Muted
 $status.Text='Готово к работе. Каждая системная операция требует подтверждения.';$maintPanel.Controls.Add($status)
@@ -204,7 +238,7 @@ $script:TaskTimer.Add_Tick({
  }
 })
 
-$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$refresh.Add_Click({try{$overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
 $saveReport.Add_Click({
  try{$audit=Get-WnAudit;$plan=Get-WnComponentPlan -Audit $audit -ManifestPath (Join-Path $script:AppRoot 'manifest\components.json')
   $report=Export-WnAuditReport -Audit $audit -ComponentPlan $plan -OutputDirectory $script:ReportsPath
@@ -216,15 +250,18 @@ $clean.Add_Click({
  $choice=[System.Windows.Forms.MessageBox]::Show('Удалить только файлы в %LOCALAPPDATA%\Temp, которым больше 14 дней? Загрузки, документы и системные папки не затрагиваются.','Очистка','YesNo','Question')
  if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action CleanUserTemp -Caption 'Очистка временных файлов'}
 })
+$refreshVolumes.Add_Click({Update-WnVolumePicker})
 $optimize.Add_Click({
- $letter=$env:SystemDrive.TrimEnd(':')
+ $letter=[string]$volumePicker.SelectedValue
+ if([string]::IsNullOrWhiteSpace($letter)){[Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
  $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить штатную оптимизацию Windows для {0}:? Windows сама выберет операцию для SSD или HDD." -f $letter),'Оптимизация','YesNo','Question')
- if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeSystemDrive -Caption 'Оптимизация системного диска' -Letter $letter -Admin}
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action OptimizeVolume -Caption ('Оптимизация диска '+$letter+':') -Letter $letter -Admin}
 })
 $scan.Add_Click({
- $letter=$env:SystemDrive.TrimEnd(':')
+ $letter=[string]$volumePicker.SelectedValue
+ if([string]::IsNullOrWhiteSpace($letter)){[Windows.Forms.MessageBox]::Show('Сначала выберите локальный диск.','Windows Next','OK','Warning')|Out-Null;return}
  $choice=[System.Windows.Forms.MessageBox]::Show(("Запустить онлайн-проверку NTFS тома {0}:?" -f $letter),'Проверка диска','YesNo','Question')
- if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanSystemDrive -Caption 'Проверка системного диска' -Letter $letter -Admin}
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action ScanVolume -Caption ('Проверка диска '+$letter+':') -Letter $letter -Admin}
 })
 $check.Add_Click({
  $choice=[System.Windows.Forms.MessageBox]::Show('Запустить DISM ScanHealth и SFC VerifyOnly? Это проверка без исправления файлов.','Проверка Windows','YesNo','Question')
@@ -253,7 +290,7 @@ $logFolder.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $scri
 
 $form.Add_Shown({
  try{
-  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnLogs
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnLogs
   $maintInfo.Text=@'
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
