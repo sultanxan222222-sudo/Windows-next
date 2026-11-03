@@ -41,7 +41,7 @@ Windows 11 Pro 21H2 is out of servicing. A supported OS path is a separate engin
 
 The GitHub Actions workflow `/.github/workflows/build-installer.yml` runs PowerShell analysis and Pester tests, then compiles a single Inno Setup EXE and uploads its SHA-256 sidecar.
 
-Current development version: **0.4.1**.
+Current development version: **0.5.0**.
 
 ## Performance assessment
 
