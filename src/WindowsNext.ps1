@@ -121,7 +121,7 @@ function Update-WnVolumePicker{
 function Update-WnComponents {
  $lines=New-Object 'System.Collections.Generic.List[string]'
  $lines.Add('WINDOWS NEXT — ПРОВЕРКА ИГРОВЫХ БИБЛИОТЕК')
- $lines.Add(('Проверено: {0}' -f (Get-Date -Format 'dd.MM.yyyy HH:mm:ss'))
+ $lines.Add(('Проверено: {0}' -f (Get-Date -Format 'dd.MM.yyyy HH:mm:ss')))
  foreach($item in @(Get-WnVCRuntimeStatus)){
   $version=[string]$item.Version
   if([string]::IsNullOrWhiteSpace($version)){$version='не установлена'}
