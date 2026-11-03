@@ -24,6 +24,7 @@
 - [x] Assess RAM layout, system-volume free space, Run startup count, and Windows build without modifying settings.
 - [x] Add reversible backup/restore for selected current-user Run startup entries; keep machine Run keys view-only.
 - [x] Add official Microsoft Visual C++ v14 x86/x64 setup with publisher signature check and post-install version verification.
+- [x] Add opt-in .NET Framework 3.5 Windows optional feature enablement through DISM, with state check and no forced reboot.
 
 ## M3 — package and release
 - [x] Build a single self-installing EXE with Inno Setup.
