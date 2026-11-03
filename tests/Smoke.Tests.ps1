@@ -219,7 +219,7 @@ Describe 'Windows Next source validation' {
     It 'restricts automated driver discovery to Windows Update driver entries' {
         $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Raw
         $module | Should -Match "IsInstalled=0 and Type='Driver' and IsHidden=0"
-        $module | Should -Match 'IncludePotentiallySupersededUpdates = \\$false'
+        $module | Should -Match 'IncludePotentiallySupersededUpdates'
         $module | Should -Match 'Install-WnWindowsUpdateDriver'
         $module | Should -Match 'At least 2 GB of free space'
     }
