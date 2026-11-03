@@ -36,6 +36,8 @@ Describe 'Windows Next source validation' {
         $app | Should -Match 'Windows Next — центр обслуживания'
         $app | Should -Match 'RepairWindows'
         $app | Should -Match 'ExportDrivers'
+        $app | Should -Match 'Update-WnVolumePicker'
+        $app | Should -Match 'OptimizeVolume'
     }
 
     It 'exposes the read-only inventory and component planner' {
