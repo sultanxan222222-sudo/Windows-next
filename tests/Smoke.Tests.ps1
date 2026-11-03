@@ -216,6 +216,13 @@ Describe 'Windows Next source validation' {
         Test-WnDriverCandidateApplicability -DeviceHardwareIds @($deviceId) -UpdateHardwareId $deviceId -CurrentDriverDate ([datetime]'2016-12-29') -UpdateDriverDate ([datetime]'2014-01-01') | Should -BeFalse
     }
 
+    It 'verifies the resulting driver date and Device Manager status after installation' {
+        $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Raw
+        $module | Should -Match 'NewerThanPreviousDriver'
+        $module | Should -Match 'DeviceManagerStatusOK'
+        $module | Should -Match 'ConfigManagerErrorCode'
+    }
+
     It 'restricts automated driver discovery to Windows Update driver entries' {
         $module = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\Modules\DriverUpdates.psm1') -Raw
         $module | Should -Match "IsInstalled=0 and Type='Driver' and IsHidden=0"
