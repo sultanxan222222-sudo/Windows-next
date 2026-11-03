@@ -200,16 +200,19 @@ function Install-WnWindowsUpdateDriver {
 
             $newDate = [datetime]$device[0].DriverDate
             $newerThanBaseline = ($newDate -gt [datetime]$baseline.CurrentDriverDate)
-            $deviceHealthy = ([int]$pnp[0].ConfigManagerErrorCode -eq 0)
+            $deviceErrorCode = if ($null -ne $pnp[0].ConfigManagerErrorCode) { [int]$pnp[0].ConfigManagerErrorCode } else { -1 }
+            $deviceHealthy = ($deviceErrorCode -eq 0)
+            $signed = ($null -ne $device[0].IsSigned -and [bool]$device[0].IsSigned)
             $verification.Add([pscustomobject]@{
                 DeviceName = [string]$device[0].DeviceName
                 DriverVersion = [string]$device[0].DriverVersion
                 DriverDate = $newDate.ToString('yyyy-MM-dd')
                 NewerThanPreviousDriver = $newerThanBaseline
                 DeviceManagerStatusOK = $deviceHealthy
+                DriverSignaturePresent = $signed
             })
 
-            if (-not $newerThanBaseline -or -not $deviceHealthy) {
+            if (-not $newerThanBaseline -or -not $deviceHealthy -or -not $signed) {
                 throw ('The Windows Update installer reported success, but the updated driver was not fully verified for {0}. Do not install another driver; inspect Device Manager and use the restore point if necessary.' -f $baseline.DeviceName)
             }
         }
