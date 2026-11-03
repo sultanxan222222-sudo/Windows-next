@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
- [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint')]
+ [ValidateSet('','CleanUserTemp','ExportDrivers','OptimizeVolume','ScanVolume','CheckWindows','RepairWindows','CreateRestorePoint','InstallVCRuntime')]
  [string]$Task='',
  [string]$Destination='',
  [string]$DriveLetter='',
@@ -14,7 +14,7 @@ $script:ReportsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Reports'
 $script:LogsPath=Join-Path $env:LOCALAPPDATA 'WindowsNext\Logs'
 [void][IO.Directory]::CreateDirectory($script:ReportsPath)
 [void][IO.Directory]::CreateDirectory($script:LogsPath)
-$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Maintenance.psm1','Performance.psm1','Startup.psm1')
+$moduleNames=@('Inventory.psm1','Report.psm1','ComponentPlan.psm1','Components.psm1','Maintenance.psm1','Performance.psm1','Startup.psm1')
 foreach($name in $moduleNames){
  $path=Join-Path $PSScriptRoot ('Modules\'+$name)
  if (-not (Test-Path -LiteralPath $path -PathType Leaf)){throw ("Не найден модуль: {0}" -f $path)}
@@ -118,6 +118,23 @@ function Update-WnVolumePicker{
   if($items.DriveLetter -contains $target){$volumePicker.SelectedValue=$target}else{$volumePicker.SelectedIndex=0}
  }
 }
+function Update-WnComponents {
+ $lines=New-Object 'System.Collections.Generic.List[string]'
+ $lines.Add('WINDOWS NEXT — ПРОВЕРКА ИГРОВЫХ БИБЛИОТЕК')
+ $lines.Add(('Проверено: {0}' -f (Get-Date -Format 'dd.MM.yyyy HH:mm:ss)'))
+ foreach($item in @(Get-WnVCRuntimeStatus)){
+  $version=[string]$item.Version
+  if([string]::IsNullOrWhiteSpace($version)){$version='не установлена'}
+  $state=if($item.Installed){'Установлена'}else{'Не обнаружена'}
+  $lines.Add(('{0}: {1}; версия: {2}' -f $item.Architecture,$state,$version))
+ }
+ $lines.Add('')
+ $lines.Add('Visual C++ Runtime x86/x64 применяется многими играми и программами.')
+ $lines.Add('Windows Next загружает только официальные установщики Microsoft, проверяет действительную цифровую подпись Microsoft Corporation и SHA-256, пропускает уже более новую версию и удаляет временные установщики после завершения.')
+ $lines.Add('Это исправляет недостающие библиотеки приложений, но не повышает DirectX или возможности видеокарты и не обещает прирост FPS.')
+ $lines.Add('Нужен интернет. Установка выполняется только после подтверждения и запроса UAC.')
+ $componentInfo.Text=$lines -join [Environment]::NewLine
+}
 function Update-WnStartupGrid {
  $backupDirectory=Join-Path $env:LOCALAPPDATA 'WindowsNext\StartupBackup'
  [void][IO.Directory]::CreateDirectory($backupDirectory)
@@ -165,6 +182,12 @@ function Finish-WnTask([object]$Result){
    $message=('Удалено файлов: {0}; освобождено: {1} МБ; пропущено: {2}' -f $Result.Result.FilesDeleted,[math]::Round($Result.Result.BytesFreed/1MB,1),$Result.Result.Skipped)
    $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   }
+  if($Result.Action -eq 'InstallVCRuntime' -and $Result.Result){
+   $message='Проверенные библиотеки Visual C++:'
+   foreach($component in @($Result.Result.Components)){$message+=[Environment]::NewLine+('{0}: {1} ({2})' -f $component.Architecture,$component.Status,$component.Version)}
+   if($Result.Result.RebootRequired){$message+=[Environment]::NewLine+'Для завершения установки требуется перезагрузка.'}
+   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
+  }
   if($Result.Action -eq 'ExportDrivers' -and $Result.Result){
    $message=('Экспортировано пакетов: {0}' -f $Result.Result.PackageCount)
    $message+=[Environment]::NewLine+'Папка: '+[string]$Result.Result.Destination
@@ -177,7 +200,7 @@ function Finish-WnTask([object]$Result){
   $message+=[Environment]::NewLine+'Журнал: '+[string]$Result.LogPath
   [System.Windows.Forms.MessageBox]::Show($message,'Windows Next','OK','Error')|Out-Null
  }
- $script:ActiveTask=$null;Update-WnLogs
+ $script:ActiveTask=$null;Update-WnLogs;try{Update-WnComponents}catch{}
 }
 function Start-WnTask{
  param([string]$Action,[string]$Caption,[string]$Destination='',[string]$Letter='',[switch]$Admin)
@@ -216,9 +239,10 @@ $tabs=New-Object System.Windows.Forms.TabControl;$tabs.Dock='Fill';$tabs.Font=Ne
 $home=New-Object System.Windows.Forms.TabPage;$home.Text='Главная';$home.BackColor=$script:Back
 $maint=New-Object System.Windows.Forms.TabPage;$maint.Text='Обслуживание';$maint.BackColor=$script:Back
 $drivers=New-Object System.Windows.Forms.TabPage;$drivers.Text='Драйверы';$drivers.BackColor=$script:Back
+$components=New-Object System.Windows.Forms.TabPage;$components.Text='Библиотеки';$components.BackColor=$script:Back
 $logs=New-Object System.Windows.Forms.TabPage;$logs.Text='Журнал';$logs.BackColor=$script:Back
 $startup=New-Object System.Windows.Forms.TabPage;$startup.Text='Автозагрузка';$startup.BackColor=$script:Back
-[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$startup,$logs))
+[void]$tabs.TabPages.AddRange(@($home,$maint,$drivers,$components,$startup,$logs))
 
 $homePanel=New-Object System.Windows.Forms.Panel;$homePanel.Dock='Fill';$homePanel.Padding=New-Object System.Windows.Forms.Padding(12);$home.Controls.Add($homePanel)
 $homeBar=New-Object System.Windows.Forms.FlowLayoutPanel;$homeBar.Dock='Top';$homeBar.Height=54;$homePanel.Controls.Add($homeBar)
@@ -254,6 +278,13 @@ $driverGrid.AllowUserToAddRows=$false;$driverGrid.AllowUserToDeleteRows=$false;$
 $driverGrid.RowHeadersVisible=$false;$driverGrid.BackgroundColor=[System.Drawing.Color]::FromArgb(17,21,28);$driverPanel.Controls.Add($driverGrid)
 $driverNote=New-Object System.Windows.Forms.Label;$driverNote.Dock='Bottom';$driverNote.Height=30
 $driverNote.ForeColor=$script:Muted;$driverNote.Text='Показаны установленные версии. Неодобренные обновления не устанавливаются.';$driverPanel.Controls.Add($driverNote);$driverPanel.Controls.SetChildIndex($driverBar,0);$driverPanel.Controls.SetChildIndex($driverNote,1)
+
+$componentPanel=New-Object System.Windows.Forms.Panel;$componentPanel.Dock='Fill';$componentPanel.Padding=New-Object System.Windows.Forms.Padding(12);$components.Controls.Add($componentPanel)
+$componentBar=New-Object System.Windows.Forms.FlowLayoutPanel;$componentBar.Dock='Top';$componentBar.Height=54;$componentPanel.Controls.Add($componentBar)
+$componentRefresh=New-WnButton 'Проверить библиотеки' 210
+$componentInstall=New-WnButton 'Установить / обновить Visual C++' 300
+$componentBar.Controls.AddRange(@($componentRefresh,$componentInstall))
+$componentInfo=New-WnTextBox;$componentInfo.Dock='Fill';$componentPanel.Controls.Add($componentInfo);$componentPanel.Controls.SetChildIndex($componentBar,0)
 
 $startupPanel=New-Object System.Windows.Forms.Panel;$startupPanel.Dock='Fill';$startupPanel.Padding=New-Object System.Windows.Forms.Padding(12);$startup.Controls.Add($startupPanel)
 $startupBar=New-Object System.Windows.Forms.FlowLayoutPanel;$startupBar.Dock='Top';$startupBar.Height=54;$startupPanel.Controls.Add($startupBar)
@@ -336,6 +367,11 @@ $backupFolder.Add_Click({
  $folder=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsNext\DriverBackup'
  [void][IO.Directory]::CreateDirectory($folder);Start-Process explorer.exe -ArgumentList ('"{0}"' -f $folder)
 })
+$componentRefresh.Add_Click({try{Update-WnComponents}catch{[System.Windows.Forms.MessageBox]::Show($_.Exception.Message,'Windows Next','OK','Error')|Out-Null}})
+$componentInstall.Add_Click({
+ $choice=[System.Windows.Forms.MessageBox]::Show('Загрузить официальные Microsoft Visual C++ Runtime x86 и x64, проверить цифровую подпись и установить только при отсутствии или более старой версии? Нужен интернет.','Игровые библиотеки','YesNo','Question')
+ if($choice -eq [System.Windows.Forms.DialogResult]::Yes){Start-WnTask -Action InstallVCRuntime -Caption 'Установка Microsoft Visual C++ Runtime' -Admin}
+})
 $logRefresh.Add_Click({Update-WnLogs})
 $logFolder.Add_Click({Start-Process explorer.exe -ArgumentList ('"{0}"' -f $script:LogsPath)})
 $startupGrid.Add_CurrentCellDirtyStateChanged({
@@ -382,7 +418,7 @@ $startupRestore.Add_Click({
 
 $form.Add_Shown({
  try{
-  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnStartupGrid;Update-WnLogs
+  $overview.Text=Get-WnOverview;Update-WnDrivers;Update-WnVolumePicker;Update-WnComponents;Update-WnStartupGrid;Update-WnLogs
   $maintInfo.Text=@'
 РАБОЧИЕ ИНСТРУМЕНТЫ WINDOWS NEXT
 
