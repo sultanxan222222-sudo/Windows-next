@@ -4,6 +4,7 @@ function Export-WnAuditReport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][psobject]$Audit,
+        [psobject]$ComponentPlan,
         [string]$OutputDirectory
     )
 
@@ -16,13 +17,15 @@ function Export-WnAuditReport {
     $jsonPath = Join-Path $OutputDirectory "WindowsNext-Audit-$stamp.json"
     $textPath = Join-Path $OutputDirectory "WindowsNext-Audit-$stamp.txt"
 
-    $Audit | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
+    $Audit | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $jsonPath -Encoding UTF8
 
     $lines = New-Object 'System.Collections.Generic.List[string]'
     $lines.Add('WINDOWS NEXT — SYSTEM INVENTORY')
     $lines.Add(('Collected (UTC): {0}' -f $Audit.CollectedAtUtc))
     $lines.Add(('Tool version: {0}' -f $Audit.ToolVersion))
+    $lines.Add(('Collection mode: {0}' -f $Audit.CollectionMode))
     $lines.Add('')
+
     $lines.Add('OPERATING SYSTEM')
     if ($null -ne $Audit.OperatingSystem) {
         $lines.Add(('Name: {0}' -f $Audit.OperatingSystem.Caption))
@@ -70,9 +73,55 @@ function Export-WnAuditReport {
 
     $lines.Add('STORAGE')
     foreach ($disk in @($Audit.Storage)) {
-        $lines.Add(('Model: {0} | type: {1} | bus: {2} | size: {3} GB | health: {4}' -f
-            $disk.Model, $disk.MediaType, $disk.BusType, $disk.SizeGB, $disk.HealthStatus))
+        $lines.Add(('Model: {0} | type: {1} | bus: {2} | size: {3} GB | health: {4} | status: {5}' -f
+            $disk.Model, $disk.MediaType, $disk.BusType, $disk.SizeGB, $disk.HealthStatus, $disk.OperationalStatus))
     }
+
+    $lines.Add('')
+    $lines.Add('MEMORY MODULES')
+    if (($Audit.PSObject.Properties.Name -contains 'Memory') -and $null -ne $Audit.Memory) {
+        foreach ($module in @($Audit.Memory.Modules)) {
+            $lines.Add(('Manufacturer: {0} | part: {1} | capacity: {2} GB | speed: {3} MHz | configured: {4} MHz | slot: {5}' -f
+                $module.Manufacturer, $module.PartNumber, $module.CapacityGB, $module.SpeedMHz,
+                $module.ConfiguredClockSpeedMHz, $module.DeviceLocator))
+        }
+        foreach ($array in @($Audit.Memory.Arrays)) {
+            $lines.Add(('Memory array: reported devices {0} | reported max {1} GB' -f
+                $array.MemoryDevices, $array.ReportedMaxCapacityGB))
+        }
+    }
+    else {
+        $lines.Add('Not available')
+    }
+
+    $lines.Add('')
+    $lines.Add('NETWORK AND BLUETOOTH DEVICES')
+    if ($Audit.PSObject.Properties.Name -contains 'NetworkDevices') {
+        foreach ($device in @($Audit.NetworkDevices)) {
+            $lines.Add(('Name: {0} | class: {1} | driver: {2} | date: {3} | INF: {4}' -f
+                $device.Name, $device.Class, $device.DriverVersion, $device.DriverDate, $device.InfName))
+            $lines.Add(('Manufacturer: {0} | signed: {1} | instance ID: {2}' -f
+                $device.Manufacturer, $device.IsSigned, $device.InstanceId))
+        }
+    }
+    else {
+        $lines.Add('Not available')
+    }
+
+    $lines.Add('')
+    $lines.Add('COMPONENT INSTALLATION PLAN')
+    if ($null -ne $ComponentPlan) {
+        $lines.Add([string]$ComponentPlan.Summary)
+        foreach ($component in @($ComponentPlan.Components)) {
+            $lines.Add(('{0}: {1} | detected: {2} | installed driver: {3}' -f
+                $component.DisplayName, $component.Decision, $component.Detected, $component.InstalledDriverVersion))
+            $lines.Add(('Reason: {0}' -f $component.Reason))
+        }
+    }
+    else {
+        $lines.Add('No compatibility plan was generated.')
+    }
+    $lines.Add('No driver package was installed by this diagnostic run.')
 
     $lines.Add('')
     $lines.Add(('Active power plan: {0}' -f $Audit.ActivePowerPlan))
@@ -82,7 +131,7 @@ function Export-WnAuditReport {
     $lines.Add('Serial numbers, product keys, usernames, network addresses, and personal file names are not collected.')
     $lines.Add('')
     $lines.Add('SAFETY')
-    $lines.Add('Read-only inventory. No driver or Windows configuration changes were made.')
+    $lines.Add('Read-only inventory and compatibility planning. No driver or Windows configuration changes were made.')
 
     $lines | Set-Content -LiteralPath $textPath -Encoding UTF8
 
