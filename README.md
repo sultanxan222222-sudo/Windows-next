@@ -4,7 +4,7 @@
 
 ## What the desktop app does
 
-The application is a Russian-language Windows Forms desktop program with four areas: system overview, maintenance, driver inventory/backup, and logs.
+The application is a Russian-language Windows Forms desktop program with six areas: system overview, maintenance, driver inventory/backup, software libraries, user startup management, and logs.
 
 - **Temporary-file cleanup:** removes only the current user's LocalAppData\Temp files older than 14 days. It does not clean Downloads, Documents, Windows folders, or recent files.
 - **Drive optimization:** invokes Windows' own Optimize-Volume operation on any selected fixed local volume, so the SSD and HDD can be handled separately. Windows decides whether to issue SSD optimization/TRIM or an HDD optimization.
@@ -44,7 +44,7 @@ Current development version: **0.4.1**.
 
 ## Performance assessment
 
-The dashboard now includes a read-only performance assessment covering installed memory modules, free space on the Windows volume, common Run-key startup entries, and the Windows build. It makes no configuration changes and does not disable startup items. The findings help prioritize safe next steps; they are not a benchmark and do not promise a frame-rate or speed increase.
+The dashboard includes a read-only assessment of memory modules, Windows-volume free space, common Run-key entries, and Windows build. The separate startup tab can disable only selected current-user Run entries after making a backup; machine-wide entries remain read-only. This can reduce the number of apps launched at sign-in, but the user must identify unnecessary items. The Visual C++ installer restores a common application prerequisite; it is not a benchmark and does not promise a frame-rate or speed increase.
 
 For local compilation on Windows with Inno Setup 6:
 
@@ -60,9 +60,9 @@ The build output is `dist\WindowsNext-Setup-<version>.exe`.
 - No voltage, overclocking, thermal-limit, or fan-safety changes.
 - No disabling Defender, Windows Update, Secure Boot, or driver-signature enforcement.
 - No forced installation of unknown drivers and no opaque registry/debloat bundles.
-- Changes are user-confirmed, logged, and limited to built-in Windows maintenance commands.
+- Changes are user-confirmed and logged. Current exceptions to built-in maintenance are limited to the verified Microsoft Visual C++ v14 installer and the explicitly backed-up current-user Run entries.
 - Do not claim zero risk. Repair functions can alter system files and must be explicitly confirmed.
 
 ## Development state
 
-The desktop maintenance center is the first functional product milestone. The next work is controlled software/component deployment, supported OS servicing assessment, additional hardware modules (chipset, audio, USB, touchpad, camera), and before/after performance measurements. A feature is not considered complete until its operation and rollback behavior are tested on the target Acer.
+Current development includes the maintenance center, read-only hardware/performance assessment, reversible current-user startup controls, and a signature-checked Microsoft Visual C++ v14 installer. Device-driver installation remains disabled: no third-party driver package has passed exact hardware-ID and Windows-build validation for this laptop. The app has not yet passed install/use/uninstall acceptance testing on the physical Acer; CI success alone is not hardware acceptance.
