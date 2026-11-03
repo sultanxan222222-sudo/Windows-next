@@ -30,14 +30,15 @@
 - [x] Install application files and Start Menu/Desktop shortcuts.
 - [x] Include the complete application and its modules in the same installer.
 - [x] Run PowerShell analysis and Pester tests in CI.
-- [ ] Validate the current build script, installer, checksum, and artifact.
+- [x] Validate the current build script, installer, checksum, and artifact in hosted CI (the CI build is not target-hardware acceptance).
 - [ ] Test install, first launch, all tabs, each maintenance action, startup backup/restore, runtime installation, and uninstall on the target Acer.
 - [ ] Provide a signed publisher certificate before any public consumer release.
 
 ## M4 — component deployment
 - [ ] Build a package catalog with exact device IDs, OS build, signed catalog, SHA-256, and provenance.
 - [ ] Research and test chipset, audio, USB, card reader, camera, touchpad, WLAN, Bluetooth, Ethernet, and graphics packages.
-- [ ] Add driver installation only after package signature, INF match, and recovery tests pass.
+- [x] Add an opt-in Windows Update Agent driver path with exact live Hardware ID matching, newer-date check, one-at-a-time install, driver export, restore point, and no forced reboot.
+- [ ] Test Windows Update discovery and installation against the exact Acer device set and verify Device Manager status after restart.
 - [ ] Provide offline package payloads in the one EXE only after they have been approved.
 - [ ] Never force-install a package or bypass driver signature checks.
 
