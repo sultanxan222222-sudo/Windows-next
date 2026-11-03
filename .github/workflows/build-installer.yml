@@ -35,6 +35,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed." }
 
       - name: Build single EXE installer
+        id: build
         shell: pwsh
         run: |
           $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
@@ -43,26 +44,40 @@ jobs:
             $compiler = Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'
           }
           if (-not (Test-Path -LiteralPath $compiler)) { throw "Inno Setup compiler not found." }
+
+          $iss = Get-Content -LiteralPath '.\installer\WindowsNext.iss' -Raw
+          if ($iss -notmatch '(?m)^#define ProductVersion "([0-9]+\.[0-9]+\.[0-9]+)"\s*          if-no-files-found: error
+          retention-days: 30
+) {
+            throw "ProductVersion was not found in installer/WindowsNext.iss."
+          }
+          $version = $Matches[1]
+          $installer = ".\dist\WindowsNext-Setup-$version.exe"
+
           New-Item -ItemType Directory -Force -Path .\dist | Out-Null
           & $compiler .\installer\WindowsNext.iss
           if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
-          if (-not (Test-Path .\dist\WindowsNext-Setup-0.3.0.exe)) {
-            throw "Expected installer EXE was not produced."
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+            throw "Expected installer EXE was not produced: $installer"
           }
+          "product_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Generate SHA-256 checksum
         shell: pwsh
+        env:
+          PRODUCT_VERSION: ${{ steps.build.outputs.product_version }}
         run: |
-          $installer = '.\dist\WindowsNext-Setup-0.3.0.exe'
+          $installer = ".\dist\WindowsNext-Setup-$env:PRODUCT_VERSION.exe"
+          if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw "Installer is missing." }
           $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -LiteralPath '.\dist\WindowsNext-Setup-0.3.0.exe.sha256' -Value "$hash  WindowsNext-Setup-0.3.0.exe" -Encoding ASCII
+          Set-Content -LiteralPath "$installer.sha256" -Value "$hash  $(Split-Path -Leaf $installer)" -Encoding ASCII
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WindowsNext-Setup-0.3.0
+          name: WindowsNext-Setup-${{ steps.build.outputs.product_version }}
           path: |
-            dist/WindowsNext-Setup-0.3.0.exe
-            dist/WindowsNext-Setup-0.3.0.exe.sha256
+            dist/WindowsNext-Setup-${{ steps.build.outputs.product_version }}.exe
+            dist/WindowsNext-Setup-${{ steps.build.outputs.product_version }}.exe.sha256
           if-no-files-found: error
           retention-days: 30
