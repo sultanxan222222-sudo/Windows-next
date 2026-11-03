@@ -1,5 +1,5 @@
 #define ProductName "Windows Next"
-#define ProductVersion "0.2.0"
+#define ProductVersion "0.3.0"
 #define ProductPublisher "Windows Next Project"
 
 [Setup]
@@ -22,9 +22,9 @@ SolidCompression=yes
 UsePreviousAppDir=yes
 RestartApplications=no
 SetupLogging=yes
-VersionInfoVersion=0.2.0.0
+VersionInfoVersion=0.3.0.0
 VersionInfoCompany={#ProductPublisher}
-VersionInfoDescription=Windows Next safe hardware inventory and maintenance foundation
+VersionInfoDescription=Windows Next desktop maintenance suite
 VersionInfoProductName={#ProductName}
 VersionInfoProductVersion={#ProductVersion}
 
@@ -48,10 +48,10 @@ Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs 
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Windows Next - diagnostics"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"
-Name: "{autodesktop}\Windows Next — диагностика"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Windows Next - Maintenance Center"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"
+Name: "{autodesktop}\Windows Next - Maintenance Center"; Filename: "{app}\Run-WindowsNext.cmd"; WorkingDir: "{app}"; Tasks: desktopicon
 Name: "{group}\Uninstall Windows Next"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "{app}\Run-WindowsNext.cmd"; Description: "Run Windows Next and scan this computer"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{app}\Run-WindowsNext.cmd"; Description: "Launch Windows Next Maintenance Center"; Flags: postinstall nowait skipifsilent
 
