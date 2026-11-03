@@ -223,7 +223,7 @@ function Invoke-WnMaintenanceAction {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint', 'InstallVCRuntime', 'CheckDriverUpdates', 'InstallSelectedDriver')]
+        [ValidateSet('CleanUserTemp', 'ExportDrivers', 'OptimizeVolume', 'ScanVolume', 'CheckWindows', 'RepairWindows', 'CreateRestorePoint', 'InstallVCRuntime', 'InstallNetFx3', 'CheckDriverUpdates', 'InstallSelectedDriver')]
         [string]$Action,
         [string]$Destination,
         [string]$DriveLetter,
@@ -242,6 +242,7 @@ function Invoke-WnMaintenanceAction {
             'RepairWindows' { Invoke-WnWindowsRepair -LogPath $logPath }
             'CreateRestorePoint' { Invoke-WnCreateRestorePoint -LogPath $logPath }
             'InstallVCRuntime' { Invoke-WnInstallVCRuntime -LogPath $logPath }
+            'InstallNetFx3' { Invoke-WnEnableNetFx3 -LogPath $logPath }
             'CheckDriverUpdates' {
                 $candidates = @(Get-WnWindowsUpdateDriverCandidates)
                 Write-WnTaskLog -Path $logPath -Message ('Windows Update returned {0} candidates that match an exact Hardware ID and have a newer driver date.' -f $candidates.Count)
