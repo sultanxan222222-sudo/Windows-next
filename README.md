@@ -52,7 +52,7 @@ For local compilation on Windows with Inno Setup 6:
 & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" .\installer\WindowsNext.iss
 ```
 
-The build output is `dist\WindowsNext-Setup-0.3.0.exe`.
+The build output is `dist\WindowsNext-Setup-<version>.exe`.
 
 ## Safety boundaries
 
