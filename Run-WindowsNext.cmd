@@ -33,10 +33,12 @@ set "RESULT=%ERRORLEVEL%"
 echo.
 if not "%RESULT%"=="0" (
     echo Windows Next stopped with an error.
-    echo Check %%LOCALAPPDATA%%\WindowsNext\Logs for the diagnostic log.
+    echo Error details may already be copied. Return to ChatGPT and press Ctrl+V.
+    echo Log folder: %%LOCALAPPDATA%%\WindowsNext\Logs
 ) else (
     echo Inventory finished successfully.
-    echo Check %%LOCALAPPDATA%%\WindowsNext\Reports for the reports.
+    echo The readable report is copied to the clipboard.
+    echo Return to ChatGPT, click the message box, press Ctrl+V, then Enter.
 )
 echo.
 pause
