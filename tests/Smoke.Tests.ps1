@@ -4,6 +4,7 @@ BeforeAll {
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Report.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\ComponentPlan.psm1') -Force
     Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Maintenance.psm1') -Force
+    Import-Module (Join-Path $script:ProjectRoot 'src\Modules\Performance.psm1') -Force
 }
 
 Describe 'Windows Next source validation' {
@@ -43,6 +44,20 @@ Describe 'Windows Next source validation' {
     It 'exposes the read-only inventory and component planner' {
         (Get-Command Get-WnAudit -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
         (Get-Command Get-WnComponentPlan -ErrorAction SilentlyContinue) | Should -Not -BeNullOrEmpty
+    }
+
+    It 'provides a read-only performance assessment without changing settings' {
+        $assessment = Get-WnPerformanceAssessment
+        $assessment.Mode | Should -Be 'ReadOnly'
+        $assessment.ChangesMade | Should -BeFalse
+        $assessment.Findings.Count | Should -BeGreaterThan 0
+        ($assessment.Findings | Where-Object { $_.Area -eq 'Автозагрузка' }).Count | Should -Be 1
+    }
+
+    It 'shows performance assessment in the main dashboard' {
+        $app = Get-Content -LiteralPath (Join-Path $script:ProjectRoot 'src\\WindowsNext.ps1') -Raw
+        $app | Should -Match 'Get-WnPerformanceAssessment'
+        $app | Should -Match 'ОЦЕНКА ПРОИЗВОДИТЕЛЬНОСТИ'
     }
 
     It 'exports JSON and TXT reports from a supplied fixture' {
