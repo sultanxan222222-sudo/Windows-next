@@ -14,7 +14,7 @@ The application is a Russian-language Windows Forms desktop program with seven a
 - **Restore point:** creates a named Windows restore point when System Protection is available.
 - **Driver backup:** exports third-party Windows driver packages to Documents\WindowsNext\DriverBackup, writes a CSV/JSON index, and calculates SHA-256 for each exported file.
 - **Device view:** shows current display, network, and Bluetooth driver versions and hardware IDs.
-- **Driver updates:** searches only the Windows Update driver category. It offers an update only when the Windows Update package's Hardware ID exactly matches a live device ID and its driver date is newer than the installed driver date. The user selects one package at a time. Before installation, Windows Next exports current third-party drivers and requires a successful restore point. It never restarts Windows automatically.
+- **Driver updates:** searches only the Windows Update driver category. It offers an update only when the Windows Update package's Hardware ID exactly matches a live device ID and its driver date is newer than the installed driver date. The user selects one package at a time. Before installation, Windows Next exports current third-party drivers and requires a successful restore point. After installation, it checks the new device driver date and Device Manager status when no reboot is required. It never restarts Windows automatically.
 - **Reports and logs:** keeps readable records under %LOCALAPPDATA%\WindowsNext.
 
 System-level tasks ask for UAC elevation separately. The app stays responsive while the task runs and checks its result.
